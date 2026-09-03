@@ -3,6 +3,14 @@
 Toutes les modifications notables de TubeKnowledge sont consignées dans ce
 fichier.
 
+## [1.0.1] — 2026-09-03
+
+### Corrigé
+
+- débloque la conservation explicite d’une divergence de contenu locale quand
+  le writer de la même machine a expiré, avec backup vérifié, confirmation
+  renforcée et réacquisition atomique de l’autorité locale.
+
 ## [1.0.0] — 2026-09-03
 
 ### Ajouté
