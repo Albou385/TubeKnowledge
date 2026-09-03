@@ -1,0 +1,50 @@
+# dependencies
+/node_modules
+
+# Next.js
+/.next
+/.next-*
+/out
+
+# production
+/build
+
+# local environment (never commit secrets or personal paths)
+.env*
+!.env.example
+
+# tests and tooling
+/coverage
+.tmp/
+*.tsbuildinfo
+next-env.d.ts
+
+# Phase 4 - environnements, runtime, modèles et médias locaux
+/.venv-transcription/
+/.tubeknowledge-runtime/
+/runtime/
+/runtime/chatgpt-packages/
+/models/
+/portability-state/
+/portability-backups/
+/restore-staging/
+*.tubeknowledge-backup.json
+*.wav
+*.mp3
+*.m4a
+*.webm
+*.opus
+*.part
+*.zip
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+
+*.egg-info/
+/test-results/

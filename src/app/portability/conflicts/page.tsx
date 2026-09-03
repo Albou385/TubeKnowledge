@@ -1,0 +1,7 @@
+import Link from "next/link";
+import { AppHeader } from "@/components/app-header";
+import { getPortabilityConfig } from "@/lib/portability/config";
+import { loadConflicts } from "@/lib/portability/conflicts";
+export const dynamic = "force-dynamic";
+export default async function ConflictsPage() { const values = await loadConflicts(getPortabilityConfig()); return <><AppHeader /><main className="mx-auto max-w-5xl space-y-6 px-4 py-8"><h1 className="text-3xl font-bold">Centre de conflits</h1><p>Aucun fichier suspect n’est supprimé ou renommé automatiquement. Toute modification de connaissance passe par Preview Phase 3. Les anciens états techniques writer restent visibles mais ne sont pas assimilés à des divergences Markdown.</p><div className="space-y-3">{values.length ? values.map((item) => <Link key={item.conflictId} href={`/portability/conflicts/${item.conflictId}`} className="block rounded-2xl border border-slate-200 p-4 dark:border-slate-800"><span className="font-semibold">{item.type}</span> · {item.severity} · {item.status}<p className="mt-2 text-sm text-slate-500">{(Array.isArray(item.paths) ? item.paths : []).join(", ") || (item.type === "stale-writer-authority" ? "État technique writer — aucune connaissance" : "Vault complet")}</p></Link>) : <p className="rounded-2xl border p-4">Aucun conflit enregistré. Lancez une vérification locale depuis le dashboard.</p>}</div></main></>; }
+

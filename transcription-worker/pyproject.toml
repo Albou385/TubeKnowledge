@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tubeknowledge-worker"
+version = "1.0.0"
+description = "Worker local d’acquisition et de transcription de TubeKnowledge"
+requires-python = ">=3.10"
+dependencies = [
+  "faster-whisper==1.2.1",
+  "yt-dlp==2026.7.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tubeknowledge_worker*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
