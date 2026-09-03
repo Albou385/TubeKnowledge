@@ -3,6 +3,14 @@
 Toutes les modifications notables de TubeKnowledge sont consignées dans ce
 fichier.
 
+## [1.0.2] — 2026-09-03
+
+### Corrigé
+
+- réconcilie une baseline locale périmée lorsque le vault courant correspond
+  déjà au checkpoint vérifié, sans modifier les connaissances Markdown ni
+  créer un nouveau checkpoint.
+
 ## [1.0.1] — 2026-09-03
 
 ### Corrigé
