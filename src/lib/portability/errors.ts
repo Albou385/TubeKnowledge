@@ -32,6 +32,8 @@ export const PUBLIC_PORTABILITY_ERRORS = {
   WRITER_REACQUIRE_CONFIRMATION_REQUIRED: "La confirmation renforcée REACQUERIR est requise.",
   WRITER_REACQUIRE_BLOCKED_BY_CONFLICT: "La réacquisition est bloquée par un conflit de connaissance.",
   WRITER_REACQUIRE_BLOCKED_BY_HANDOFF: "La réacquisition est bloquée par un handoff en attente.",
+  EXPIRED_LOCAL_CONFLICT_REACQUIRE_NOT_ALLOWED: "La conservation et la réacquisition ne sont pas autorisées dans l’état local actuel.",
+  EXPIRED_LOCAL_CONFLICT_CONFIRMATION_REQUIRED: "La confirmation exacte CONSERVER ET REACQUERIR est requise.",
   WRITER_DISASTER_RECOVERY_NOT_ALLOWED: "La récupération d’urgence exige un writer distant expiré et une identité locale distincte.",
   WRITER_DISASTER_RECOVERY_DELAY_ACTIVE: "Le délai de sécurité après expiration du writer distant n’est pas terminé.",
   WRITER_DISASTER_RECOVERY_HANDOFF_ACTIVE: "Un handoff normal ou d’absence prolongée est encore actif.",
