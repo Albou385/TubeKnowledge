@@ -43,8 +43,8 @@ async function main() {
 await rm(root, { recursive: true, force: true });
 await Promise.all([
   mkdir(path.join(vault, "00_SYSTEME"), { recursive: true }),
-  mkdir(path.join(vault, "01_BIBLIOTHEQUE", "Intelligence-artificielle"), { recursive: true }),
-  mkdir(path.join(vault, "01_BIBLIOTHEQUE", "Alimentation"), { recursive: true }),
+  mkdir(path.join(vault, "01_BIBLIOTHEQUE", "Astronomie", "Observation"), { recursive: true }),
+  mkdir(path.join(vault, "01_BIBLIOTHEQUE", "Cuisine", "Fermentation"), { recursive: true }),
   mkdir(path.join(vault, "01_BIBLIOTHEQUE", "Demonstration"), { recursive: true }),
   mkdir(path.join(vault, "02_SOURCES"), { recursive: true }),
   mkdir(workflows, { recursive: true }),
@@ -53,16 +53,16 @@ await Promise.all([
 ]);
 
 await Promise.all([
-  writeFile(path.join(vault, "INDEX.md"), "# Bibliothèque de démonstration\n\n- [[01_BIBLIOTHEQUE/Intelligence-artificielle/agents|Agents IA]]\n- [[01_BIBLIOTHEQUE/Alimentation/proteines|Protéines]]\n", "utf8"),
+  writeFile(path.join(vault, "INDEX.md"), "# Bibliothèque de démonstration\n\n- [[01_BIBLIOTHEQUE/Astronomie/Observation/observer-le-ciel|Observer le ciel]]\n- [[01_BIBLIOTHEQUE/Cuisine/Fermentation/pain-au-levain|Pain au levain]]\n", "utf8"),
   writeFile(path.join(vault, "00_SYSTEME", "README.md"), "# Système\n\nFixture QA locale et temporaire.\n", "utf8"),
   writeFile(path.join(vault, "00_SYSTEME", "PROJECT_INSTRUCTIONS.md"), "# Instructions\n\nConserver la provenance et vérifier avant toute écriture.\n", "utf8"),
   writeFile(path.join(vault, "00_SYSTEME", "LIBRARY_RULES.md"), "# Règles de bibliothèque\n\nUtiliser des chemins relatifs et des sources vérifiables.\n", "utf8"),
-  writeFile(path.join(vault, "00_SYSTEME", "TAXONOMY.md"), "# Taxonomie\n\n- Intelligence artificielle\n- Alimentation\n", "utf8"),
+  writeFile(path.join(vault, "00_SYSTEME", "TAXONOMY.md"), "# Taxonomie\n\n- Astronomie\n- Cuisine\n", "utf8"),
   writeFile(path.join(vault, "00_SYSTEME", "RULES.md"), "# Règles\n\nCiter les sources et signaler les inférences.\n", "utf8"),
-  writeFile(path.join(vault, "01_BIBLIOTHEQUE", "Intelligence-artificielle", "agents.md"), "# Agents IA\n\n## Boucle agentique\n\nUn agent logiciel observe un état, choisit une action et vérifie son résultat. Le contexte et les garde-fous limitent les erreurs.\n\n## Mémoire\n\nUne mémoire externe doit conserver la provenance et rester vérifiable.\n", "utf8"),
-  writeFile(path.join(vault, "01_BIBLIOTHEQUE", "Alimentation", "proteines.md"), "# Protéines\n\n## Repères\n\nLes protéines participent à la structure des tissus. Les besoins varient selon la personne et le contexte.\n", "utf8"),
+  writeFile(path.join(vault, "01_BIBLIOTHEQUE", "Astronomie", "Observation", "observer-le-ciel.md"), "# Observer le ciel\n\n## Repères du ciel\n\nUne carte et un horizon dégagé aident à repérer les constellations.\n\n## Carnet\n\nUn carnet garde la date, l'heure et les conditions d'observation.\n", "utf8"),
+  writeFile(path.join(vault, "01_BIBLIOTHEQUE", "Cuisine", "Fermentation", "pain-au-levain.md"), "# Pain au levain\n\n## Repères\n\nLa fermentation lente développe les arômes et la structure de la mie.\n", "utf8"),
   writeFile(path.join(vault, "01_BIBLIOTHEQUE", "Demonstration", "nouvelle-connaissance.md"), "# Nouvelle connaissance de démonstration\n\nCette note prouve le lien final du parcours temporaire.\n", "utf8"),
-  writeFile(path.join(vault, "02_SOURCES", "videos.md"), "# Vidéos\n\n| Titre | URL | Sections | Statut |\n|---|---|---|---|\n| Comprendre les agents IA | https://www.youtube.com/watch?v=abcdefghijk | Intelligence artificielle | Importée |\n| Protéines au quotidien | https://www.youtube.com/watch?v=lmnopqrstuv | Alimentation | À revoir |\n", "utf8"),
+  writeFile(path.join(vault, "02_SOURCES", "videos.md"), "# Sources de démonstration\n\n| Titre | URL | Sections | Statut |\n|---|---|---|---|\n| Observer le ciel | https://example.test/astronomie | Astronomie | Importée |\n| Pain au levain | https://example.test/cuisine | Cuisine | À revoir |\n", "utf8"),
   writeFile(path.join(state, "machine.json"), `${JSON.stringify(machine, null, 2)}\n`, "utf8"),
   writeFile(path.join(state, "conflicts.json"), "[]\n", "utf8"),
 ]);
@@ -75,17 +75,17 @@ async function job(id: string, status: JobState, progress: number | null, messag
   const value = {
     schemaVersion: 1, id, createdAt: now, updatedAt: now, status,
     stage: status === "waiting-for-selection" ? "inspection-complete" : completed ? "completed" : "transcribing",
-    progress, message, title: "Comprendre les agents IA", sourceKind: completed ? "manual-subtitles" : undefined,
+    progress, message, title: "Observer le ciel", sourceKind: completed ? "manual-subtitles" : undefined,
     source: { type: "youtube", canonicalUrl: `https://www.youtube.com/watch?v=${id.slice(-11)}`, videoId: id.slice(-11) },
-    inspection: { videoId: id.slice(-11), title: "Comprendre les agents IA", durationSeconds: 754, canonicalUrl: `https://www.youtube.com/watch?v=${id.slice(-11)}`, language: "fr", chapters: [], liveStatus: "not-live", estimatedAudioBytes: 8_000_000, warnings: [], subtitles: [
+    inspection: { videoId: id.slice(-11), title: "Observer le ciel", durationSeconds: 754, canonicalUrl: `https://www.youtube.com/watch?v=${id.slice(-11)}`, language: "fr", chapters: [], liveStatus: "not-live", estimatedAudioBytes: 8_000_000, warnings: [], subtitles: [
       { language: "fr", name: "Français", origin: "manual", formats: [{ extension: "vtt" }] },
       { language: "en", name: "English", origin: "automatic", formats: [{ extension: "vtt" }] },
     ] }, warnings: [], artifacts: completed ? [{ kind: "transcript", name: "transcript.txt" }, { kind: "metadata", name: "metadata.json" }] : [],
   };
   await writeFile(path.join(acquisitions, id, "job.json"), `${JSON.stringify(value, null, 2)}\n`, "utf8");
   if (completed) {
-    await writeFile(path.join(output, "transcript.txt"), "Les agents IA suivent une boucle observer, décider, agir et vérifier. La provenance des sources et les garde-fous restent essentiels.\n", "utf8");
-    await writeFile(path.join(output, "metadata.json"), `${JSON.stringify({ schemaVersion: 1, jobId: id, title: value.title, language: "fr", sourceKind: "manual-subtitles", videoId: value.inspection.videoId, canonicalUrl: value.inspection.canonicalUrl, hashes: { "transcript.txt": sha256("Les agents IA suivent une boucle observer, décider, agir et vérifier. La provenance des sources et les garde-fous restent essentiels.\n") } })}\n`, "utf8");
+    await writeFile(path.join(output, "transcript.txt"), "Une carte du ciel et un horizon dégagé aident à observer les constellations. Noter la date et la météo rend les observations comparables.\n", "utf8");
+    await writeFile(path.join(output, "metadata.json"), `${JSON.stringify({ schemaVersion: 1, jobId: id, title: value.title, language: "fr", sourceKind: "manual-subtitles", videoId: value.inspection.videoId, canonicalUrl: value.inspection.canonicalUrl, hashes: { "transcript.txt": sha256("Une carte du ciel et un horizon dégagé aident à observer les constellations. Noter la date et la météo rend les observations comparables.\n") } })}\n`, "utf8");
   }
 }
 
@@ -100,7 +100,7 @@ await Promise.all([
   job(ids.imported, "completed", 1, "Transcript prêt."),
 ]);
 
-const storedAnalysisPackage = await generatePackage({ action: "generate", acquisitionId: ids.analysis, selectedFiles: ["01_BIBLIOTHEQUE/Intelligence-artificielle/agents.md"], suggestedFilesRejected: [], allowStructuralUpdate: false }, { environment: process.env, processEnvironment: process.env, runtimeRoot: path.join(runtime, "chatgpt-packages"), packageId: ids.package, now: new Date(now) });
+const storedAnalysisPackage = await generatePackage({ action: "generate", acquisitionId: ids.analysis, selectedFiles: ["01_BIBLIOTHEQUE/Astronomie/Observation/observer-le-ciel.md"], suggestedFilesRejected: [], allowStructuralUpdate: false }, { environment: process.env, processEnvironment: process.env, runtimeRoot: path.join(runtime, "chatgpt-packages"), packageId: ids.package, now: new Date(now) });
 const validResultZip = await packageZip(validManifest({ packageId: ids.package, source: { type: "youtube-video", title: storedAnalysisPackage.manifest.source.title, url: storedAnalysisPackage.manifest.source.url } }));
 await writeFile(path.join(root, "valid-analysis-result.zip"), validResultZip);
 
@@ -122,8 +122,8 @@ await Promise.all([
 
 const mock = await new MockAnalysisProvider(() => new Date(now), () => "60000000-0000-4000-8000-000000000001").run({
   workflowId: ids.transcript,
-  transcript: "Les agents IA observent, décident, agissent et vérifient.",
-  metadata: { title: "Agents IA", sourceUrl: "https://www.youtube.com/watch?v=abcdefghijk", videoId: "abcdefghijk", language: "fr" },
+  transcript: "Une carte du ciel et un horizon dégagé aident à observer les constellations.",
+  metadata: { title: "Observer le ciel", sourceUrl: "https://example.test/astronomie", videoId: "fixture-astronomie", language: "fr" },
   context: [], writeScope: { createPrefixes: ["01_BIBLIOTHEQUE/"], replaceFiles: [] }, freshnessHash: "a".repeat(64), confirmedPaid: false,
 });
 if (!mock.importZip) throw new Error("Fixture mock absente.");

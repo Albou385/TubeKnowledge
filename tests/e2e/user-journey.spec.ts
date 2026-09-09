@@ -113,9 +113,9 @@ test("bibliothèque — la navigation de lecture expose les domaines et les noti
   await open(page, "/library");
   await expect(page.getByRole("heading", { name: "Domaines, sujets et notions" })).toBeVisible();
   await expect(page.getByText("Domaine", { exact: true }).first()).toBeVisible();
-  const domain = page.getByRole("link", { name: "Intelligence-artificielle" }).first();
+  const domain = page.getByRole("link", { name: "Astronomie" }).first();
   await expect(domain).toBeVisible();
-  await expect(page.getByRole("link", { name: "Agents IA" }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: "Observer le ciel" }).first()).toBeVisible();
   await domain.click();
   await expect(page.getByText("Domaine Markdown", { exact: true })).toBeVisible();
 });
@@ -145,18 +145,18 @@ test("A — une vidéo traverse les vrais écrans jusqu’à une citation ouvrab
   await previewAndApply(page, value);
   await page.getByRole("link", { name: "Retrouver les connaissances" }).click();
   await expect(page.getByRole("heading", { name: /Transformez une vidéo/i })).toBeVisible();
-  await page.locator("#global-search").fill("agents");
+  await page.locator("#global-search").fill("horizon");
   await page.getByRole("button", { name: "Chercher" }).click();
   await expect(page.getByText(/résultat/)).toBeVisible();
 
   await page.getByRole("link", { name: "Poser une question" }).first().click();
-  await page.locator("#library-question").fill("Quels garde-fous accompagnent les agents IA ?");
+  await page.locator("#library-question").fill("Quels repères aident à observer le ciel ?");
   await page.getByRole("button", { name: "Interroger la bibliothèque" }).click();
   await expect(page.getByRole("heading", { name: "Réponse fondée sur les sources" })).toBeVisible();
-  const citation = page.getByRole("link", { name: /01_BIBLIOTHEQUE\/Intelligence-artificielle\/agents\.md/ }).first();
+  const citation = page.getByRole("link", { name: /01_BIBLIOTHEQUE\/Astronomie\/Observation\/observer-le-ciel\.md/ }).first();
   await expect(citation).toBeVisible();
   await citation.click();
-  await expect(page.getByRole("heading", { name: "Agents IA" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Observer le ciel" })).toBeVisible();
 });
 
 test("B — file déterministe de 10 URL : concurrence 1, pause, reprise, annulation, retry et persistance simulée", async ({ page }) => {

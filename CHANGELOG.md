@@ -3,6 +3,17 @@
 Toutes les modifications notables de TubeKnowledge sont consignées dans ce
 fichier.
 
+## [1.1.0] — 2026-09-09
+
+### Ajouté
+
+- navigation de bibliothèque par domaines, sujets et notions;
+- parcours de qualification déterministe et benchmark de récupération synthétique.
+
+### Corrigé
+
+- remplace les erreurs techniques de prévisualisation d’import par une action utilisateur claire.
+
 ## [1.0.2] — 2026-09-03
 
 ### Corrigé

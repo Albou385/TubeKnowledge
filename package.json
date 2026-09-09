@@ -1,6 +1,6 @@
 {
   "name": "tubeknowledge",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "private": true,
   "description": "Bibliothèque Markdown locale avec acquisition et transcription hors vault.",
   "engines": {

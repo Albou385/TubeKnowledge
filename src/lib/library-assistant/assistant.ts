@@ -9,7 +9,7 @@ import { slugifyHeading } from "@/lib/markdown/document-analysis";
 import { libraryQuestionSchema, type LibraryQuestion } from "./schema";
 
 const STOPWORDS = new Set([
-  "a", "ai", "au", "aux", "avec", "ce", "ces", "dans", "de", "des", "du", "elle", "en", "et", "est", "il", "je", "la", "le", "les", "ma", "mes", "mon", "ne", "notre", "nous", "ou", "par", "pas", "pour", "que", "qui", "sa", "se", "ses", "sur", "un", "une", "vos", "votre", "vous",
+  "a", "ai", "au", "aux", "avec", "ce", "ces", "comment", "dans", "de", "des", "du", "elle", "en", "et", "est", "il", "je", "la", "le", "les", "ma", "mes", "mon", "ne", "notre", "nous", "ou", "par", "pas", "pour", "pourquoi", "que", "quel", "quelle", "quelles", "quels", "qui", "quoi", "sa", "se", "ses", "sur", "un", "une", "vos", "votre", "vous",
   "about", "and", "are", "can", "compare", "does", "for", "from", "how", "in", "is", "my", "of", "on", "or", "the", "to", "what", "which", "with",
 ]);
 
@@ -96,9 +96,9 @@ function bestPassage(document: MarkdownDocument, terms: string[]) {
         headingAnchor = count === 1 ? base : `${base}-${count}`;
       } else headingAnchor = undefined;
     }
-    const searchable = normalize(lines.slice(Math.max(0, index - 1), Math.min(lines.length, index + 3)).join(" "));
+    const searchable = normalize(lines.slice(Math.max(0, index - 1), index + 1).join(" "));
     const score = terms.reduce((sum, term) => sum + (searchable.includes(term) ? 1 : 0), 0);
-    if (score > best.score) best = { score, line: index, heading, anchor: headingAnchor };
+    if (score > best.score || (score === best.score && headingAnchor && !best.anchor)) best = { score, line: index, heading, anchor: headingAnchor };
   }
   const start = Math.max(0, best.line - 1);
   const passageLines = lines.slice(start, Math.min(lines.length, start + 6)).map((value, offset) => ({ value, line: start + offset + 1 })).filter((item) => item.value.trim() && !/^#{1,6}\s/.test(item.value));

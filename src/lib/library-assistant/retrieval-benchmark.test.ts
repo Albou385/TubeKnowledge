@@ -5,8 +5,8 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { answerLibraryQuestion, expandRetrievalTerms } from "./assistant";
-import { RETRIEVAL_BENCHMARK_CASES } from "./retrieval-benchmark";
+import { answerLibraryQuestion } from "./assistant";
+import { RETRIEVAL_BENCHMARK_CASES, SYNTHETIC_BENCHMARK_DOCUMENTS } from "./retrieval-benchmark";
 
 const roots: string[] = [];
 afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))); });
@@ -15,29 +15,18 @@ async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), "tk-retrieval-benchmark-"));
   roots.push(root);
   await writeFile(path.join(root, "INDEX.md"), "# Index\n\nNavigation générale seulement.\n", "utf8");
-  const byPath = new Map<string, typeof RETRIEVAL_BENCHMARK_CASES>();
-  for (const item of RETRIEVAL_BENCHMARK_CASES) {
-    const cases = byPath.get(item.expectedPath);
-    if (cases) cases.push(item);
-    else byPath.set(item.expectedPath, [item]);
-  }
-  for (const [relativePath, cases] of byPath) {
-    const target = path.join(root, ...relativePath.split("/"));
+  for (const document of SYNTHETIC_BENCHMARK_DOCUMENTS) {
+    const target = path.join(root, ...document.relativePath.split("/"));
     await mkdir(path.dirname(target), { recursive: true });
-    const sections = cases.map((item) => `## ${item.expectedAnchor ?? `source-${item.id}`}\n\n${item.question}\n`).join("\n");
-    await writeFile(target, `# ${path.basename(relativePath, ".md")}\n\n${sections}`, "utf8");
+    await writeFile(target, document.content, "utf8");
   }
-  // Les cas multi-source doivent également rester vérifiables dans une fixture
-  // isolée; cette note ne représente aucune réponse utilisateur.
-  await writeFile(path.join(root, "01_BIBLIOTHEQUE", "support.md"), "# Support\n\nOrganisation locale, recherche, sommeil et portabilité.\n", "utf8");
   return root;
 }
 
 async function fingerprint(root: string) {
   const hash = createHash("sha256");
-  for (const item of RETRIEVAL_BENCHMARK_CASES) {
-    const relativePath = item.expectedPath;
-    hash.update(relativePath); hash.update(await readFile(path.join(root, ...relativePath.split("/"))));
+  for (const document of SYNTHETIC_BENCHMARK_DOCUMENTS) {
+    hash.update(document.relativePath); hash.update(await readFile(path.join(root, ...document.relativePath.split("/"))));
   }
   return hash.digest("hex");
 }
@@ -49,16 +38,21 @@ describe("benchmark de récupération", () => {
     expect(RETRIEVAL_BENCHMARK_CASES.every((item) => item.expectedPath.endsWith(".md") && !item.expectedPath.startsWith("/") && !item.expectedPath.includes(".."))).toBe(true);
   });
 
-  it("étend seulement les synonymes locaux nécessaires au benchmark", () => {
-    expect(expandRetrievalTerms(["ephemere", "prospection"])).toEqual(expect.arrayContaining(["throwaway", "jetable", "lead", "generation"]));
+  it("utilise seulement des documents, chemins et contenus synthétiques", () => {
+    expect(SYNTHETIC_BENCHMARK_DOCUMENTS).toHaveLength(7);
+    expect(SYNTHETIC_BENCHMARK_DOCUMENTS.every((document) => document.relativePath.startsWith("01_BIBLIOTHEQUE/") && document.relativePath.split("/").length === 4)).toBe(true);
   });
 
   it("s'exécute sur une fixture temporaire sans modifier sa bibliothèque", async () => {
     const root = await fixture(); const before = await fingerprint(root);
     for (const item of RETRIEVAL_BENCHMARK_CASES) {
       const answer = await answerLibraryQuestion({ question: item.question, provider: "extractive", limit: 12 }, { YOUTUBE_LIBRARY_PATH: root });
-      expect(answer.citations.some((citation) => citation.relativePath === item.expectedPath && citation.lineStart >= 1)).toBe(true);
+      const citation = answer.citations.find((candidate) => candidate.relativePath === item.expectedPath);
+      expect(answer.citations[0]?.relativePath).toBe(item.expectedPath);
+      expect(citation).toMatchObject({ anchor: item.expectedAnchor });
+      expect(citation?.lineStart).toBeGreaterThanOrEqual(1);
       if (item.rejectIndexAsTop) expect(answer.citations[0]?.relativePath).not.toMatch(/(^|\/)INDEX\.md$/);
+      if (item.requireMultipleSources) expect(answer.documentsUsed.length).toBeGreaterThanOrEqual(2);
     }
     expect(await fingerprint(root)).toBe(before);
   });
