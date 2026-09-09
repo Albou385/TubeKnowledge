@@ -12,7 +12,7 @@ const actions = [
   { href: "/add-video", label: "Ajouter une vidéo", description: "De l’URL à la connaissance, avec reprise locale.", tone: "bg-cyan-400 text-slate-950" },
   { href: "/workflows", label: "Continuer un traitement", description: "Retrouver une transcription, une analyse ou une vérification.", tone: "bg-slate-900 text-white dark:bg-white dark:text-slate-950" },
   { href: "/ask", label: "Poser une question", description: "Réponse locale avec passages et citations vérifiables.", tone: "bg-violet-500 text-white" },
-  { href: "/library/INDEX.md", label: "Ouvrir la bibliothèque", description: "Lire la source de vérité Markdown.", tone: "border border-slate-300 dark:border-slate-700" },
+  { href: "/library", label: "Ouvrir la bibliothèque", description: "Explorer les domaines, sujets et notions Markdown.", tone: "border border-slate-300 dark:border-slate-700" },
 ];
 
 export default async function HomePage() {

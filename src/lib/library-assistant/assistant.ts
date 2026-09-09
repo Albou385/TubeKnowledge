@@ -9,9 +9,29 @@ import { slugifyHeading } from "@/lib/markdown/document-analysis";
 import { libraryQuestionSchema, type LibraryQuestion } from "./schema";
 
 const STOPWORDS = new Set([
-  "a", "ai", "au", "aux", "avec", "ce", "ces", "dans", "de", "des", "du", "elle", "en", "et", "est", "il", "je", "la", "le", "les", "ma", "mes", "mon", "ne", "notre", "nous", "ou", "par", "pas", "pour", "que", "qui", "sa", "se", "ses", "sur", "un", "une", "vos", "votre", "vous",
+  "a", "ai", "au", "aux", "avec", "ce", "ces", "comment", "dans", "de", "des", "du", "elle", "en", "et", "est", "il", "je", "la", "le", "les", "ma", "mes", "mon", "ne", "notre", "nous", "ou", "par", "pas", "pour", "pourquoi", "que", "quel", "quelle", "quelles", "quels", "qui", "quoi", "sa", "se", "ses", "sur", "un", "une", "vos", "votre", "vous",
   "about", "and", "are", "can", "compare", "does", "for", "from", "how", "in", "is", "my", "of", "on", "or", "the", "to", "what", "which", "with",
 ]);
+
+// Équivalences volontairement petites, observées dans les notions de la
+// bibliothèque. Elles rendent des formulations usuelles retrouvables sans
+// prétendre effectuer une recherche sémantique ou appeler un service externe.
+const RETRIEVAL_EQUIVALENTS: Record<string, string[]> = {
+  "code": ["throwaway", "jetable", "prototype"],
+  "jetable": ["throwaway", "prototype"],
+  "ephemere": ["throwaway", "jetable", "prototype"],
+  "reecriture": ["rewrite", "hard"],
+  "complete": ["hard", "rewrite"],
+  "pollution": ["poisoning", "context"],
+  "memoire": ["contexte", "court", "long", "write"],
+  "locale": ["local", "local-first", "markdown"],
+  "hors": ["local", "local-first"],
+  "ligne": ["local", "local-first"],
+  "prospects": ["lead", "generation", "outbound", "clients"],
+  "prospection": ["lead", "generation", "outbound", "clients"],
+  "urgence": ["wartime", "climate"],
+  "sommeil": ["rest", "landing"],
+};
 
 export interface LibraryCitation {
   citationId: string;
@@ -53,6 +73,10 @@ export function significantTerms(question: string): string[] {
   return [...new Set(terms)].slice(0, 30);
 }
 
+export function expandRetrievalTerms(terms: string[]): string[] {
+  return [...new Set(terms.flatMap((term) => [term, ...(RETRIEVAL_EQUIVALENTS[term] ?? [])]))].slice(0, 50);
+}
+
 function bestPassage(document: MarkdownDocument, terms: string[]) {
   const lines = document.content.split(/\r?\n/);
   let heading: string | undefined;
@@ -72,9 +96,9 @@ function bestPassage(document: MarkdownDocument, terms: string[]) {
         headingAnchor = count === 1 ? base : `${base}-${count}`;
       } else headingAnchor = undefined;
     }
-    const searchable = normalize(lines.slice(Math.max(0, index - 1), Math.min(lines.length, index + 3)).join(" "));
+    const searchable = normalize(lines.slice(Math.max(0, index - 1), index + 1).join(" "));
     const score = terms.reduce((sum, term) => sum + (searchable.includes(term) ? 1 : 0), 0);
-    if (score > best.score) best = { score, line: index, heading, anchor: headingAnchor };
+    if (score > best.score || (score === best.score && headingAnchor && !best.anchor)) best = { score, line: index, heading, anchor: headingAnchor };
   }
   const start = Math.max(0, best.line - 1);
   const passageLines = lines.slice(start, Math.min(lines.length, start + 6)).map((value, offset) => ({ value, line: start + offset + 1 })).filter((item) => item.value.trim() && !/^#{1,6}\s/.test(item.value));
@@ -103,7 +127,7 @@ export async function answerLibraryQuestion(rawRequest: unknown, environment: Li
   const request: LibraryQuestion = libraryQuestionSchema.parse(rawRequest);
   const config = parseLibraryConfig(environment);
   if (!config.ok) throw new Error("La bibliothèque n’est pas configurée.");
-  const terms = significantTerms(request.question);
+  const terms = expandRetrievalTerms(significantTerms(request.question));
   if (!terms.length) return { question: request.question, provider: request.provider, fixture: request.provider === "mock", answer: "Aucun terme significatif n’a pu être extrait. Reformulez la question avec un sujet précis.", citations: [], documentsUsed: [], uncertainty: "Aucune source candidate." };
   const paths = flatten(await buildLibraryTree(config.rootPath));
   const documents: Array<{ document: MarkdownDocument; score: number }> = [];

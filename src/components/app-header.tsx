@@ -85,7 +85,7 @@ export function AppHeader({
           <Link href="/video-queue" className="shrink-0 text-slate-600 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-300">File</Link>
           <Link href="/workflows" className="shrink-0 text-slate-600 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-300">Traitements</Link>
           <Link href="/ask" className="shrink-0 font-semibold text-violet-700 hover:text-violet-600 dark:text-violet-300">Question</Link>
-          <Link href="/videos" className="shrink-0 text-slate-600 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-300">Bibliothèque</Link>
+          <Link href="/library" className="shrink-0 text-slate-600 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-300">Bibliothèque</Link>
         </nav>
         <AdvancedNavigation />
         <div className="order-4 w-full flex-1 sm:order-none sm:min-w-64"><SearchBox /></div>

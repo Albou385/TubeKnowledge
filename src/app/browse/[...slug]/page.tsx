@@ -25,6 +25,13 @@ function nodeHref(node: LibraryNode): string {
   return node.type === "file" ? `/library/${encoded}` : `/browse/${encoded}`;
 }
 
+function semanticLabel(node: LibraryNode): string {
+  const segments = node.relativePath.split("/");
+  if (segments[0] !== "01_BIBLIOTHEQUE") return node.type === "directory" ? "Dossier" : "Document";
+  if (node.type === "directory") return segments.length === 2 ? "Domaine" : segments.length === 3 ? "Sujet" : "Dossier";
+  return node.name.toLocaleLowerCase("fr") === "index.md" ? "Index" : "Notion";
+}
+
 export default async function BrowsePage({ params }: BrowsePageProps) {
   const library = await inspectLibrary();
   if (!library.available) return <ConfigurationHelp message={library.message} />;
@@ -52,14 +59,14 @@ export default async function BrowsePage({ params }: BrowsePageProps) {
           </div>
         ) : (
           <>
-            <p className="text-xs font-semibold tracking-[0.16em] text-cyan-600 uppercase">Dossier Markdown</p>
+            <p className="text-xs font-semibold tracking-[0.16em] text-cyan-600 uppercase">{semanticLabel(directory)} Markdown</p>
             <h1 className="mt-2 text-3xl font-bold">{directory.name}</h1>
             <p className="mt-2 text-sm text-slate-500">{directory.relativePath}</p>
             {directory.children.length > 0 ? (
               <div className="mt-7 grid gap-3 sm:grid-cols-2">
                 {directory.children.map((node) => (
                   <Link key={node.relativePath} href={nodeHref(node)} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-cyan-500 dark:border-slate-800 dark:bg-slate-900">
-                    <span className="text-xs text-slate-500">{node.type === "file" ? "Document" : "Dossier"}</span>
+                    <span className="text-xs text-slate-500">{semanticLabel(node)}</span>
                     <strong className="mt-1 block">{node.name.replace(/\.md$/i, "")}</strong>
                   </Link>
                 ))}
