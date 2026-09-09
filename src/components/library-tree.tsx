@@ -9,7 +9,13 @@ function libraryHref(relativePath: string): string {
   return `/library/${relativePath.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-function TreeNodes({ nodes, currentPath, onSectionToggle }: { nodes: LibraryNode[]; currentPath?: string; onSectionToggle: () => void }) {
+function nodeKind(node: LibraryNode, depth: number, semantic: boolean): string {
+  if (!semantic) return node.type === "directory" ? "" : "";
+  if (node.type === "directory") return depth === 0 ? "Domaine" : depth === 1 ? "Sujet" : "Dossier";
+  return node.name.toLocaleLowerCase("fr") === "index.md" ? "Index" : depth >= 2 ? "Notion" : "Document";
+}
+
+function TreeNodes({ nodes, currentPath, onSectionToggle, depth = 0, semantic = false }: { nodes: LibraryNode[]; currentPath?: string; onSectionToggle: () => void; depth?: number; semantic?: boolean }) {
   return (
     <ul className="space-y-1">
       {nodes.map((node) =>
@@ -17,11 +23,11 @@ function TreeNodes({ nodes, currentPath, onSectionToggle }: { nodes: LibraryNode
           <li key={`directory:${node.relativePath}`}>
             <details className="tree-directory" data-path={node.relativePath} open={Boolean(currentPath?.startsWith(`${node.relativePath}/`))} onToggle={onSectionToggle}>
               <summary className="cursor-pointer rounded-lg px-2 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800">
-                <span aria-hidden="true">▸</span> {node.name}
+                <span aria-hidden="true">▸</span> {semantic ? <span><span className="mr-1 text-[10px] font-bold tracking-wide text-cyan-700 uppercase dark:text-cyan-300">{nodeKind(node, depth, semantic)}</span>{node.name}</span> : node.name}
               </summary>
               <div className="ml-3 border-l border-slate-200 pl-2 dark:border-slate-800">
                 {node.children.length > 0 ? (
-                  <TreeNodes nodes={node.children} currentPath={currentPath} onSectionToggle={onSectionToggle} />
+                  <TreeNodes nodes={node.children} currentPath={currentPath} onSectionToggle={onSectionToggle} depth={depth + 1} semantic={semantic} />
                 ) : (
                   <p className="px-2 py-1 text-xs text-slate-600">Dossier vide</p>
                 )}
@@ -35,7 +41,7 @@ function TreeNodes({ nodes, currentPath, onSectionToggle }: { nodes: LibraryNode
               aria-current={currentPath === node.relativePath ? "page" : undefined}
               className="block rounded-lg px-2 py-1.5 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-950 aria-[current=page]:bg-cyan-100 aria-[current=page]:text-cyan-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 dark:aria-[current=page]:bg-cyan-950 dark:aria-[current=page]:text-cyan-200"
             >
-              <span aria-hidden="true">◇</span> {node.name.replace(/\.md$/i, "")}
+              <span aria-hidden="true">◇</span> {semantic ? <span><span className="mr-1 text-[10px] font-bold tracking-wide text-cyan-700 uppercase dark:text-cyan-300">{nodeKind(node, depth, semantic)}</span>{node.name.replace(/\.md$/i, "")}</span> : node.name.replace(/\.md$/i, "")}
             </Link>
           </li>
         ),
@@ -86,9 +92,18 @@ export function LibraryTree({ nodes, currentPath }: { nodes: LibraryNode[]; curr
     }
   }
 
+  const knowledge = nodes.find((node): node is Extract<LibraryNode, { type: "directory" }> => node.type === "directory" && node.relativePath === "01_BIBLIOTHEQUE");
+  const otherNodes = nodes.filter((node) => node !== knowledge);
+
   return (
     <nav ref={navigationRef} aria-label="Arborescence de la bibliothèque" onKeyDown={handleKeyboard}>
-      {nodes.length > 0 ? (
+      {knowledge ? (
+        <>
+          <p className="mb-2 text-[10px] font-bold tracking-[0.14em] text-slate-500 uppercase">Parcours de lecture</p>
+          <TreeNodes nodes={knowledge.children} currentPath={currentPath} onSectionToggle={saveOpenSections} semantic />
+          {otherNodes.length > 0 ? <details className="mt-4"><summary className="cursor-pointer rounded-lg px-2 py-1.5 text-xs font-semibold tracking-[0.12em] text-slate-500 uppercase">Autres documents</summary><div className="mt-2"><TreeNodes nodes={otherNodes} currentPath={currentPath} onSectionToggle={saveOpenSections} /></div></details> : null}
+        </>
+      ) : nodes.length > 0 ? (
         <TreeNodes nodes={nodes} currentPath={currentPath} onSectionToggle={saveOpenSections} />
       ) : (
         <p className="rounded-lg border border-dashed border-slate-700 p-4 text-sm text-slate-500">

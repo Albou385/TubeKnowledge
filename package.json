@@ -32,19 +32,21 @@
     "phase7:smoke": "powershell -ExecutionPolicy Bypass -File scripts/phase7-smoke-fake.ps1",
     "phase11a:smoke": "node --import ./scripts/node-tsx-windows-bootstrap.mjs --import tsx scripts/phase11a-smoke-fake.ts",
     "phase11b:smoke": "node --import ./scripts/node-tsx-windows-bootstrap.mjs --import tsx scripts/phase11b-smoke-fake.ts",
+    "benchmark:retrieval": "node --import ./scripts/node-tsx-windows-bootstrap.mjs --import tsx scripts/run-retrieval-benchmark.ts",
     "travel:smoke": "node --import ./scripts/node-tsx-windows-bootstrap.mjs --import tsx scripts/travel-portability-smoke-fake.ts",
     "e2e": "playwright test tests/e2e/phase10-2.spec.ts",
     "e2e:phase10-1": "playwright test tests/e2e/overnight-qa.spec.ts",
     "e2e:phase10-3": "playwright test --config=playwright.phase10-3.config.ts",
     "e2e:phase10-4": "playwright test --config=playwright.phase10-4.config.ts",
     "e2e:phase11b": "powershell -ExecutionPolicy Bypass -File scripts/phase11b-e2e-fake.ps1",
+    "e2e:user-journey": "playwright test --config=playwright.user-journey.config.ts",
     "test:worker": "python -m pytest transcription-worker/tests",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "diff": "^9.0.0",
-    "next": "16.2.12",
+    "next": "16.3.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
@@ -73,6 +75,6 @@
       "postcss": "8.5.23"
     },
     "nanoid": "3.3.18",
-    "sharp": "0.35.3"
+    "sharp": "0.35.4"
   }
 }

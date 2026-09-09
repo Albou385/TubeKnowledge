@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
     if (file.size > IMPORT_LIMITS.maxZipBytes) return NextResponse.json({ error: "Le ZIP dépasse 10 MiB." }, { status: 413 });
     const preview = await previewImport(Buffer.from(await file.arrayBuffer()));
     return NextResponse.json({ preview }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Paquet invalide." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: "Le ZIP est invalide ou illisible. Choisissez un ZIP de résultat valide puis prévisualisez-le de nouveau." }, { status: 400 });
   }
 }

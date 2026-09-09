@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useState } from "react";
+import Link from "next/link";
 
 import { AppHeader } from "@/components/app-header";
 import { LibraryTree } from "@/components/library-tree";
@@ -28,6 +29,9 @@ export function LibraryShell({
             </h2>
             <span className="text-xs text-slate-600">Markdown</span>
           </div>
+          <Link href="/library" className="mb-4 block rounded-lg bg-cyan-50 px-3 py-2 text-sm font-semibold text-cyan-800 hover:bg-cyan-100 dark:bg-cyan-950/50 dark:text-cyan-200 dark:hover:bg-cyan-950">
+            Explorer domaines → sujets → notions
+          </Link>
           <LibraryTree nodes={tree} currentPath={currentPath} />
         </aside>
         <main className="min-w-0 p-4 sm:p-8 lg:p-10">{children}</main>

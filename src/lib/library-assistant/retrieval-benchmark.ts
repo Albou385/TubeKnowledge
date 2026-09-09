@@ -1,0 +1,37 @@
+export type RetrievalBenchmarkCategory = "notion-précise" | "synonyme" | "multi-source" | "cross-domain" | "comparaison" | "notion-multi-vidéos";
+
+export interface RetrievalBenchmarkCase {
+  id: string;
+  category: RetrievalBenchmarkCategory;
+  question: string;
+  expectedPath: string;
+  expectedAnchor?: string;
+  requireMultipleSources?: boolean;
+  rejectIndexAsTop?: boolean;
+}
+
+// Les attentes sont des titres, notions et chemins relatifs constatés lors du
+// relevé lecture seule de la bibliothèque. Aucun extrait de note n'est copié.
+export const RETRIEVAL_BENCHMARK_CASES: RetrievalBenchmarkCase[] = [
+  { id: "context-definition", category: "notion-précise", question: "Qu'est-ce que le context engineering ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Prompting-et-gestion-du-contexte/context-engineering.md", expectedAnchor: "resume", rejectIndexAsTop: true },
+  { id: "context-prompt-comparison", category: "comparaison", question: "Quelle différence entre prompt engineering et context engineering ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Prompting-et-gestion-du-contexte/context-engineering.md", expectedAnchor: "distinction-avec-le-prompt-engineering", rejectIndexAsTop: true },
+  { id: "context-poisoning-synonym", category: "synonyme", question: "Comment éviter la pollution de contexte ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Prompting-et-gestion-du-contexte/context-engineering.md", expectedAnchor: "context-poisoning", rejectIndexAsTop: true },
+  { id: "context-memory", category: "notion-précise", question: "À quoi sert la mémoire à long terme dans une pile de contexte ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Prompting-et-gestion-du-contexte/context-engineering.md", expectedAnchor: "composition-dune-pile-de-contexte", rejectIndexAsTop: true },
+  { id: "context-compression", category: "notion-précise", question: "Comment réduire un historique trop long sans perdre le signal ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Prompting-et-gestion-du-contexte/context-engineering.md", expectedAnchor: "3-compress", rejectIndexAsTop: true },
+  { id: "prototype-production", category: "comparaison", question: "Comment distinguer prototype et production ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Prototypage-et-passage-en-production/architecture-a-deux-pistes-prototype-production.md", expectedAnchor: "comparaison-des-deux-pistes", rejectIndexAsTop: true },
+  { id: "throwaway-synonym", category: "synonyme", question: "Pourquoi conserver du code éphémère pour apprendre ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Prototypage-et-passage-en-production/architecture-a-deux-pistes-prototype-production.md", expectedAnchor: "principe-du-throwaway-code", rejectIndexAsTop: true },
+  { id: "hard-rewrite-synonym", category: "synonyme", question: "Pourquoi adopter un hard rewrite plutôt que polir un prototype ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Prototypage-et-passage-en-production/architecture-a-deux-pistes-prototype-production.md", expectedAnchor: "hard-rewrite-apres-validation", rejectIndexAsTop: true },
+  { id: "agent-parallelism", category: "notion-précise", question: "Quelles tâches sont adaptées au parallélisme avec des agents ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Prototypage-et-passage-en-production/architecture-a-deux-pistes-prototype-production.md", expectedAnchor: "parallelisme-avec-des-agents", rejectIndexAsTop: true },
+  { id: "blank-canvas", category: "notion-précise", question: "Quel problème de validation produit est appelé blank canvas ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Prototypage-et-passage-en-production/prototypage-connecte-et-validation-produit.md", expectedAnchor: "le-probleme-du-blank-canvas", rejectIndexAsTop: true },
+  { id: "client-acquisition", category: "synonyme", question: "Comment organiser la prospection de nouveaux clients pour un service IA ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Services-IA-et-entrepreneuriat/acquerir-et-convertir-des-clients-pour-un-service-ia.md", expectedAnchor: "deux-mecanismes-de-lead-generation", rejectIndexAsTop: true },
+  { id: "offer-triangle", category: "notion-précise", question: "Que contient l'offer triangle pour une offre de service IA ?", expectedPath: "01_BIBLIOTHEQUE/Intelligence-artificielle/Services-IA-et-entrepreneuriat/concevoir-et-valider-une-offre-de-service-ia.md", expectedAnchor: "loffer-triangle", rejectIndexAsTop: true },
+  { id: "local-first", category: "notion-précise", question: "Quels sont les principes d'un système de notes local-first ?", expectedPath: "01_BIBLIOTHEQUE/Productivite/Gestion-des-connaissances-personnelles/systeme-de-notes-local-first-et-reliees.md", expectedAnchor: "principes-essentiels", rejectIndexAsTop: true },
+  { id: "offline-notes-synonym", category: "synonyme", question: "Pourquoi garder une copie locale des notes pour travailler hors ligne ?", expectedPath: "01_BIBLIOTHEQUE/Productivite/Gestion-des-connaissances-personnelles/systeme-de-notes-local-first-et-reliees.md", expectedAnchor: "pourquoi-le-stockage-local-est-valorise-dans-la-video", rejectIndexAsTop: true },
+  { id: "backlinks", category: "notion-précise", question: "À quoi servent les backlinks dans un réseau de connaissances ?", expectedPath: "01_BIBLIOTHEQUE/Productivite/Gestion-des-connaissances-personnelles/systeme-de-notes-local-first-et-reliees.md", expectedAnchor: "backlinks-et-reseau-de-connaissances", rejectIndexAsTop: true },
+  { id: "search-over-folders", category: "notion-précise", question: "Pourquoi préférer la recherche aux dossiers profonds dans Obsidian ?", expectedPath: "01_BIBLIOTHEQUE/Productivite/Gestion-des-connaissances-personnelles/organiser-un-vault-obsidian-progressivement.md", expectedAnchor: "recherche-plutot-que-dossiers-profonds", rejectIndexAsTop: true },
+  { id: "three-c-framework", category: "notion-précise", question: "Quels sont les trois C pour allouer ses soirées ?", expectedPath: "01_BIBLIOTHEQUE/Productivite/Gestion-du-temps-et-recuperation/cadre-3c-pour-allouer-ses-soirees.md", expectedAnchor: "resume", rejectIndexAsTop: true },
+  { id: "wartime-synonym", category: "synonyme", question: "Comment gérer une soirée en période d'urgence temporaire ?", expectedPath: "01_BIBLIOTHEQUE/Productivite/Gestion-du-temps-et-recuperation/cadre-3c-pour-allouer-ses-soirees.md", expectedAnchor: "wartime", rejectIndexAsTop: true },
+  { id: "evening-bank", category: "notion-multi-vidéos", question: "Quels dépôts, retraits et dettes composent le compte bancaire des soirées ?", expectedPath: "01_BIBLIOTHEQUE/Productivite/Gestion-du-temps-et-recuperation/concevoir-des-soirees-intentionnelles.md", expectedAnchor: "le-compte-bancaire-des-soirees", rejectIndexAsTop: true },
+  { id: "evening-cross-domain", category: "cross-domain", question: "Comment le cadre Clock adapte-t-il le rythme et le sommeil dans une soirée ?", expectedPath: "01_BIBLIOTHEQUE/Productivite/Gestion-du-temps-et-recuperation/cadre-3c-pour-allouer-ses-soirees.md", requireMultipleSources: true, rejectIndexAsTop: true },
+  { id: "knowledge-cross-domain", category: "multi-source", question: "Comment un système local-first préserve-t-il la portabilité et la recherche des notes ?", expectedPath: "01_BIBLIOTHEQUE/Productivite/Gestion-des-connaissances-personnelles/systeme-de-notes-local-first-et-reliees.md", requireMultipleSources: true, rejectIndexAsTop: true },
+];

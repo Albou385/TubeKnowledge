@@ -13,6 +13,26 @@ const STOPWORDS = new Set([
   "about", "and", "are", "can", "compare", "does", "for", "from", "how", "in", "is", "my", "of", "on", "or", "the", "to", "what", "which", "with",
 ]);
 
+// Équivalences volontairement petites, observées dans les notions de la
+// bibliothèque. Elles rendent des formulations usuelles retrouvables sans
+// prétendre effectuer une recherche sémantique ou appeler un service externe.
+const RETRIEVAL_EQUIVALENTS: Record<string, string[]> = {
+  "code": ["throwaway", "jetable", "prototype"],
+  "jetable": ["throwaway", "prototype"],
+  "ephemere": ["throwaway", "jetable", "prototype"],
+  "reecriture": ["rewrite", "hard"],
+  "complete": ["hard", "rewrite"],
+  "pollution": ["poisoning", "context"],
+  "memoire": ["contexte", "court", "long", "write"],
+  "locale": ["local", "local-first", "markdown"],
+  "hors": ["local", "local-first"],
+  "ligne": ["local", "local-first"],
+  "prospects": ["lead", "generation", "outbound", "clients"],
+  "prospection": ["lead", "generation", "outbound", "clients"],
+  "urgence": ["wartime", "climate"],
+  "sommeil": ["rest", "landing"],
+};
+
 export interface LibraryCitation {
   citationId: string;
   title: string;
@@ -51,6 +71,10 @@ export function significantTerms(question: string): string[] {
     .filter((term) => term.value.length >= 2 && (!STOPWORDS.has(term.value) || term.acronym))
     .map((term) => term.value);
   return [...new Set(terms)].slice(0, 30);
+}
+
+export function expandRetrievalTerms(terms: string[]): string[] {
+  return [...new Set(terms.flatMap((term) => [term, ...(RETRIEVAL_EQUIVALENTS[term] ?? [])]))].slice(0, 50);
 }
 
 function bestPassage(document: MarkdownDocument, terms: string[]) {
@@ -103,7 +127,7 @@ export async function answerLibraryQuestion(rawRequest: unknown, environment: Li
   const request: LibraryQuestion = libraryQuestionSchema.parse(rawRequest);
   const config = parseLibraryConfig(environment);
   if (!config.ok) throw new Error("La bibliothèque n’est pas configurée.");
-  const terms = significantTerms(request.question);
+  const terms = expandRetrievalTerms(significantTerms(request.question));
   if (!terms.length) return { question: request.question, provider: request.provider, fixture: request.provider === "mock", answer: "Aucun terme significatif n’a pu être extrait. Reformulez la question avec un sujet précis.", citations: [], documentsUsed: [], uncertainty: "Aucune source candidate." };
   const paths = flatten(await buildLibraryTree(config.rootPath));
   const documents: Array<{ document: MarkdownDocument; score: number }> = [];
