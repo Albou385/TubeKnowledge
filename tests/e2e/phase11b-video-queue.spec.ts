@@ -7,7 +7,7 @@ import path from "node:path";
 import type { AddVideoResult, VideoQueueSnapshot } from "../../src/lib/video-queue/engine";
 import type { VideoQueueItem, VideoQueueItemState } from "../../src/lib/video-queue/schema";
 
-const qaRoot = path.join(os.tmpdir(), "tubeknowledge-playwright-qa");
+const qaRoot = path.join(os.tmpdir(), "tubeknowledge-phase11b-playwright");
 const vault = path.join(qaRoot, "vault");
 const sessions = path.join(qaRoot, "import-sessions");
 const states: VideoQueueItemState[] = ["queued", "inspecting", "transcribing", "transcript-ready", "analysis-required", "result-ready", "imported", "paused", "cancelled", "failed"];
