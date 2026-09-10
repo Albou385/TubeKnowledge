@@ -7,6 +7,7 @@ const relativeMarkdownPath = z.string().min(1).max(500).refine((value) => {
 
 export const analysisInputSchema = z.object({
   workflowId: z.string().uuid(),
+  libraryLanguage: z.string().trim().min(2).max(40).default("fr"),
   transcript: z.string().min(1).max(500_000),
   metadata: z.object({
     title: z.string().trim().min(1).max(500),

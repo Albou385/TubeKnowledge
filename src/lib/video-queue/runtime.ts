@@ -26,6 +26,7 @@ export function hashQueueRequest(value: unknown): string {
 
 function statePath(root: string): string { return path.join(root, "queue-state.json"); }
 function lockPath(root: string): string { return path.join(root, "queue-state.lock"); }
+function runnerLockPath(root: string): string { return path.join(root, "queue-runner.lock"); }
 
 export async function loadVideoQueueStore(root = videoQueueRuntimePath()): Promise<VideoQueueStore> {
   try {
@@ -52,6 +53,50 @@ export async function saveVideoQueueStore(store: VideoQueueStore, root = videoQu
 }
 
 export interface VideoQueueLock { release: () => Promise<void> }
+
+/**
+ * Verrou non bloquant du runner. Le verrou d'état protège chaque écriture; celui-ci
+ * sérialise les boucles autonomes entre processus sans faire attendre une requête UI.
+ */
+export async function acquireVideoQueueRunnerLock(
+  root = videoQueueRuntimePath(),
+  now: () => Date = () => new Date(),
+): Promise<VideoQueueLock | null> {
+  await mkdir(root, { recursive: true });
+  const target = runnerLockPath(root);
+  const token = randomUUID();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const handle = await open(target, "wx", 0o600);
+      await handle.writeFile(JSON.stringify({ token, createdAt: now().toISOString() }), "utf8");
+      await handle.sync();
+      await handle.close();
+      return {
+        release: async () => {
+          try {
+            const current = JSON.parse(await readFile(target, "utf8")) as { token?: string };
+            if (current.token === token) await rm(target, { force: true });
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+          }
+        },
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      try {
+        if (now().getTime() - (await stat(target)).mtimeMs > LOCK_STALE_MS) {
+          await rm(target, { force: true });
+          continue;
+        }
+      } catch (statError) {
+        if ((statError as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw statError;
+      }
+      return null;
+    }
+  }
+  return null;
+}
 
 export async function acquireVideoQueueLock(
   root = videoQueueRuntimePath(),

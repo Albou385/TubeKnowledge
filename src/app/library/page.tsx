@@ -1,6 +1,7 @@
 import { ConfigurationHelp } from "@/components/configuration-help";
 import { LibraryNavigationOverview } from "@/components/library-navigation-overview";
 import { LibraryShell } from "@/components/library-shell";
+import { SearchBox } from "@/components/search-box";
 import { getLibraryNavigation } from "@/lib/library/library-navigation";
 import { inspectLibrary } from "@/lib/library/library-reader";
 
@@ -12,9 +13,9 @@ export default async function LibraryIndexPage() {
   const domains = await getLibraryNavigation(library.tree);
   return <LibraryShell tree={library.tree}>
     <div className="mx-auto max-w-6xl">
-      <p className="text-xs font-semibold tracking-[0.16em] text-cyan-700 uppercase dark:text-cyan-300">Bibliothèque</p>
-      <h1 className="mt-2 text-3xl font-bold">Domaines, sujets et notions</h1>
-      <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-400">Navigation de lecture calculée à partir des fichiers Markdown présents. Les résumés, sources et relations ne sont affichés que lorsqu’ils sont explicitement lisibles dans les notes.</p>
+      <h1 className="text-3xl font-bold">Bibliothèque</h1>
+      <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-400">Retrouvez vos connaissances par domaine, puis par sujet et notion.</p>
+      <div className="mt-6 max-w-xl"><SearchBox /></div>
       <LibraryNavigationOverview domains={domains} />
     </div>
   </LibraryShell>;

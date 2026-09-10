@@ -17,14 +17,14 @@ export function WorkflowDetail({ initialWorkflow, initialJob }: { initialWorkflo
   const router = useRouter();
   const [workflow, setWorkflow] = useState(initialWorkflow);
   const [job, setJob] = useState(initialJob);
-  const [selected, setSelected] = useState(() => initialJob?.inspection ? recommendedSubtitleTrack(initialJob.inspection.subtitles) : undefined);
+  const [selected, setSelected] = useState(() => initialJob?.inspection ? recommendedSubtitleTrack(initialJob.inspection.subtitles, initialJob.inspection.language) : undefined);
   const [allLanguages, setAllLanguages] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState("");
   const requestInFlight = useRef(false);
-  const visibleTracks = useMemo(() => visibleWorkflowSubtitleTracks(job?.inspection?.subtitles ?? [], allLanguages), [allLanguages, job]);
-  const selectedTrack = visibleTracks.find((track) => sameSubtitleTrack(track, selected)) ?? recommendedSubtitleTrack(job?.inspection?.subtitles ?? []);
+  const visibleTracks = useMemo(() => visibleWorkflowSubtitleTracks(job?.inspection?.subtitles ?? [], allLanguages, job?.inspection?.language), [allLanguages, job]);
+  const selectedTrack = visibleTracks.find((track) => sameSubtitleTrack(track, selected)) ?? recommendedSubtitleTrack(job?.inspection?.subtitles ?? [], job?.inspection?.language);
 
   useEffect(() => {
     if (!ACTIVE.has(workflow.state)) return;

@@ -5,10 +5,10 @@ export const VIDEO_QUEUE_STATE_LABELS: Record<VideoQueueItemState, string> = {
   queued: "En attente",
   inspecting: "Inspection",
   transcribing: "Transcription",
-  "transcript-ready": "Transcript prêt",
-  "analysis-required": "Analyse requise",
-  "result-ready": "Résultat prêt à vérifier",
-  imported: "Ajoutée à la bibliothèque",
+  "transcript-ready": "Analyse",
+  "analysis-required": "Analyse",
+  "result-ready": "Vérification nécessaire",
+  imported: "Terminé",
   paused: "En pause",
   cancelled: "Annulée",
   failed: "Échec",
@@ -50,8 +50,8 @@ export type AddResultGroup = "accepted" | "submission" | "queue" | "workflow" | 
 export const ADD_RESULT_TITLES: Record<AddResultGroup, string> = {
   accepted: "Vidéos ajoutées",
   submission: "Doublons dans la soumission",
-  queue: "Déjà dans la file",
-  workflow: "Workflow déjà existant",
+  queue: "Déjà en cours",
+  workflow: "Déjà en cours",
   library: "Vidéo déjà analysée",
   invalid: "URL invalide",
 };
@@ -77,16 +77,16 @@ export function safeVideoLabel(videoId?: string): string {
 }
 
 export function queueNextAction(item: VideoQueueItem): string {
-  if (item.state === "paused" && item.pauseReason === "source-selection-required") return "Choisir la transcription dans le traitement individuel.";
-  if (item.state === "paused") return "Reprendre la file lorsque vous êtes prêt.";
+  if (item.state === "paused" && item.pauseReason === "source-selection-required") return "Vérification nécessaire avant de poursuivre.";
+  if (item.state === "paused") return "Le traitement reprendra lorsque vous le demanderez.";
   const actions: Record<Exclude<VideoQueueItemState, "paused">, string> = {
-    queued: "Attendre le démarrage de l’inspection.",
-    inspecting: "Attendre la fin de l’inspection.",
-    transcribing: "Suivre la transcription dans le traitement individuel.",
-    "transcript-ready": "Préparer l’analyse dans le traitement individuel.",
-    "analysis-required": "Continuer l’analyse manuelle.",
-    "result-ready": "Vérifier les changements avant tout ajout.",
-    imported: "Ouvrir les connaissances depuis le traitement.",
+    queued: "En attente.",
+    inspecting: "Inspection en cours.",
+    transcribing: "Transcription en cours.",
+    "transcript-ready": "Analyse en cours.",
+    "analysis-required": "Analyse en cours.",
+    "result-ready": "Vérification nécessaire.",
+    imported: "Connaissances ajoutées à la bibliothèque.",
     cancelled: "Aucune action; ajoutez de nouveau l’URL si nécessaire.",
     failed: "Examiner l’échec puis réessayer explicitement.",
   };
@@ -94,13 +94,10 @@ export function queueNextAction(item: VideoQueueItem): string {
 }
 
 export function workflowActionLabel(item: VideoQueueItem): string {
-  if (item.state === "paused" && item.pauseReason === "source-selection-required") return "Choisir la transcription";
-  if (item.state === "transcript-ready") return "Préparer l’analyse";
-  if (item.state === "analysis-required") return "Continuer l’analyse";
-  if (item.state === "result-ready") return "Vérifier le résultat";
-  if (item.state === "imported") return "Ouvrir le traitement terminé";
-  if (item.state === "failed") return "Examiner le traitement";
-  return "Ouvrir le traitement";
+  if (item.state === "paused" || item.state === "result-ready") return "Vérifier";
+  if (item.state === "imported") return "Voir le résultat";
+  if (item.state === "failed") return "Voir le détail";
+  return "Voir le détail";
 }
 
 export function publicQueueItemError(code?: string): string | null {
@@ -108,6 +105,13 @@ export function publicQueueItemError(code?: string): string | null {
   const messages: Record<string, string> = {
     INSPECTION_FAILED: "L’inspection a échoué. Vérifiez la disponibilité de YouTube puis réessayez.",
     ACQUISITION_FAILED: "La transcription n’a pas pu démarrer. Ouvrez le traitement pour voir l’action proposée.",
+    VIDEO_UNAVAILABLE: "Cette vidéo n’est pas disponible. Vérifiez l’URL ou son accès, puis réessayez si elle redevient disponible.",
+    AUTH_REQUIRED: "YouTube demande une authentification. Utilisez une vidéo publiquement accessible ou vérifiez son accès.",
+    NETWORK_ERROR: "La connexion à YouTube a échoué. Vérifiez le réseau puis réessayez.",
+    YOUTUBE_ACCESS_FAILED: "YouTube a refusé ou limité l’accès à cette vidéo. Vérifiez sa disponibilité puis réessayez.",
+    INVALID_URL: "L’URL YouTube est invalide. Corrigez-la avant de réessayer.",
+    TRANSCRIPT_UNAVAILABLE: "Aucun transcript exploitable n’est disponible automatiquement pour cette vidéo.",
+    AI_PROVIDER_CONFIGURATION_REQUIRED: "L’analyse automatique doit être configurée avant de pouvoir ajouter cette vidéo à la bibliothèque.",
     TRANSCRIPTION_INTERRUPTED: "La transcription a été interrompue. Utilisez Réessayer pour reprendre le même traitement.",
     YOUTUBE_RATE_LIMITED: "YouTube limite temporairement les requêtes. Attendez avant de réessayer.",
     QUEUE_INSPECTION_FAILED: "L’inspection a échoué. Réessayez lorsque la source est disponible.",

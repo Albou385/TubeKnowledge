@@ -7,11 +7,11 @@ import path from "node:path";
 import type { AddVideoResult, VideoQueueSnapshot } from "../../src/lib/video-queue/engine";
 import type { VideoQueueItem, VideoQueueItemState } from "../../src/lib/video-queue/schema";
 
-const qaRoot = path.join(os.tmpdir(), "tubeknowledge-phase11b-playwright");
+const qaRoot = path.join(os.tmpdir(), "tubeknowledge-playwright-qa");
 const vault = path.join(qaRoot, "vault");
 const sessions = path.join(qaRoot, "import-sessions");
 const states: VideoQueueItemState[] = ["queued", "inspecting", "transcribing", "transcript-ready", "analysis-required", "result-ready", "imported", "paused", "cancelled", "failed"];
-const stateTitles = ["En attente", "Inspection", "Transcription", "Transcript prêt", "Analyse requise", "Résultat prêt à vérifier", "Ajoutée à la bibliothèque", "En pause", "Annulée", "Échec"];
+const stateTitles = ["En attente", "Inspection", "Transcription", "Analyse", "Analyse", "Vérification nécessaire", "Terminé", "En pause", "Annulée", "Échec"];
 
 function queueItem(state: VideoQueueItemState, index: number): VideoQueueItem {
   const prefix = (index + 1).toString().padStart(8, "0");
@@ -42,8 +42,10 @@ async function mockQueueApi(page: Page, initial = queue()) {
   let current = structuredClone(initial);
   let reconcileCount = 0;
   let addCount = 0;
+  let readCount = 0;
   await page.route(/\/api\/video-queue(?:\/.*)?$/, async (route) => {
     const request = route.request(); const url = new URL(request.url());
+    if (request.method() === "GET" && url.pathname === "/api/video-queue") { readCount++; return fulfill(route, { queue: current }); }
     if (request.method() !== "POST") return route.continue();
     if (url.pathname === "/api/video-queue/reconcile") { reconcileCount++; return fulfill(route, { queue: current }); }
     if (url.pathname === "/api/video-queue/pause") { current = { ...current, paused: true }; return fulfill(route, { queue: current }); }
@@ -71,7 +73,7 @@ async function mockQueueApi(page: Page, initial = queue()) {
     }
     return route.continue();
   });
-  return { get reconcileCount() { return reconcileCount; }, get addCount() { return addCount; } };
+  return { get reconcileCount() { return reconcileCount; }, get addCount() { return addCount; }, get readCount() { return readCount; } };
 }
 
 async function open(page: Page, target = "/video-queue") {
@@ -90,72 +92,69 @@ test.describe.configure({ mode: "serial" });
 
 test("file vide, navigation claire et saisie multiligne accessible", async ({ page }) => {
   await mockQueueApi(page, emptyQueue); await page.setViewportSize({ width: 1440, height: 900 }); await open(page);
-  await expect(page.getByRole("heading", { name: "La file est vide" })).toBeVisible();
-  const input = page.getByLabel("URLs YouTube, une par ligne");
+  await expect(page.getByRole("heading", { name: "Aucune vidéo en cours" })).toBeVisible();
+  const input = page.getByLabel("URLs YouTube");
   await input.fill("  https://youtu.be/abcDEF_1234  \n\nhttps://youtube.com/shorts/xyzABC_9876\n");
   await expect(page.getByText("2 / 100 lignes")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Ajouter à la file" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Ajouter" })).toBeEnabled();
   await assertSafeResponsive(page);
-  await open(page, "/add-video"); await expect(page.getByRole("link", { name: "Ajouter plusieurs vidéos" })).toHaveAttribute("href", "/video-queue");
-  await open(page, "/workflows"); await expect(page.getByRole("link", { name: "Ouvrir la file" })).toHaveAttribute("href", "/video-queue");
+  await open(page, "/add-video"); await expect(page.getByRole("heading", { name: "Ajouter des vidéos", level: 1 })).toBeVisible();
 });
 
 test("soumission mixte, six catégories et prévention du double clic", async ({ page }) => {
   const api = await mockQueueApi(page, emptyQueue); await open(page);
-  await page.getByLabel("URLs YouTube, une par ligne").fill(["https://youtu.be/accepted01", "https://youtu.be/accepted01", "https://youtu.be/inqueue001", "https://youtu.be/workflow01", "https://youtu.be/library001", "pas une url"].join("\n"));
-  const submit = page.getByRole("button", { name: "Ajouter à la file" });
+  await page.getByLabel("URLs YouTube").fill(["https://youtu.be/accepted01", "https://youtu.be/accepted01", "https://youtu.be/inqueue001", "https://youtu.be/workflow01", "https://youtu.be/library001", "pas une url"].join("\n"));
+  const submit = page.getByRole("button", { name: "Ajouter" });
   await submit.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
   await expect(page.getByRole("heading", { name: "Résultat de l’ajout" })).toBeVisible();
-  for (const title of ["Vidéos ajoutées", "Doublons dans la soumission", "Déjà dans la file", "Workflow déjà existant", "Vidéo déjà analysée", "URL invalide"]) await expect(page.getByText(new RegExp(`^${title}`))).toBeVisible();
+  for (const title of ["Vidéos ajoutées", "Doublons dans la soumission", "Déjà en cours", "Vidéo déjà analysée", "URL invalide"]) await expect(page.getByText(new RegExp(`^${title}`)).first()).toBeVisible();
   expect(api.addCount).toBe(1);
   await expect(page.getByRole("link", { name: "Ouvrir le traitement existant" })).toHaveAttribute("href", /\/workflows\//);
 });
 
 test("dix états, prochaines actions et lien de décision humaine", async ({ page }) => {
   await mockQueueApi(page); await open(page);
-  for (const title of stateTitles) await expect(page.getByText(title, { exact: true })).toBeVisible();
+  for (const title of stateTitles) await expect(page.getByText(title, { exact: true }).first()).toBeVisible();
   const paused = page.locator('[data-queue-state="paused"]');
-  await expect(paused.getByText("Choisir la transcription dans le traitement individuel.")).toBeVisible();
-  await expect(paused.getByRole("link", { name: "Choisir la transcription" })).toHaveAttribute("href", /\/workflows\//);
+  await expect(paused.getByText("Vérification nécessaire avant de poursuivre.")).toBeVisible();
+  await expect(paused.getByRole("link", { name: "Vérifier" })).toHaveAttribute("href", /\/workflows\//);
   await expect(page.locator('[data-queue-state="failed"]').getByRole("alert")).toContainText("YouTube limite temporairement");
 });
 
-test("réconcilie l’état persistant au premier chargement après un redémarrage simulé", async ({ page }) => {
+test("affiche l’état persistant sans utiliser la page comme moteur de file", async ({ page }) => {
   const persisted = queue([queueItem("paused", 7)], true);
   const api = await mockQueueApi(page, persisted);
   await open(page);
   await expect(page.getByText("En pause", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Reprendre la file" })).toBeVisible();
-  expect(api.reconcileCount).toBe(1);
+  await expect(page.getByRole("button", { name: "Reprendre" })).toBeVisible();
+  expect(api.reconcileCount).toBe(0);
 });
 
 test("pause, reprise, annulation, retry et réconciliation idempotents côté interface", async ({ page }) => {
   const api = await mockQueueApi(page); await open(page);
   await page.getByRole("button", { name: "Mettre en pause" }).click();
-  await expect(page.getByRole("button", { name: "Reprendre la file" })).toBeVisible();
-  await page.getByRole("button", { name: "Reprendre la file" }).click();
+  await expect(page.getByRole("button", { name: "Reprendre" })).toBeVisible();
+  await page.getByRole("button", { name: "Reprendre" }).click();
   await expect(page.getByRole("button", { name: "Mettre en pause" })).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await page.locator('[data-queue-state="queued"]').getByRole("button", { name: "Annuler" }).click();
   await expect(page.locator('[data-queue-state="cancelled"]')).toHaveCount(2);
   await page.locator('[data-queue-state="failed"]').getByRole("button", { name: "Réessayer" }).click();
-  await expect(page.getByText("Nouvelle tentative lancée sur le même traitement.")).toBeVisible();
-  await page.getByRole("button", { name: "Actualiser l’état" }).click();
-  expect(api.reconcileCount).toBeGreaterThanOrEqual(2);
+  await expect(page.getByText("Nouvelle tentative lancée.")).toBeVisible();
+  expect(api.reconcileCount).toBe(0);
 });
 
-test("polling borné et timer nettoyé au démontage", async ({ page }) => {
+test("l’actualisation est une lecture explicite, sans polling ni moteur navigateur", async ({ page }) => {
   const api = await mockQueueApi(page); await open(page);
-  await page.waitForTimeout(4_500);
-  expect(api.reconcileCount).toBeGreaterThanOrEqual(2); expect(api.reconcileCount).toBeLessThanOrEqual(3);
-  await page.goto("/add-video", { waitUntil: "networkidle" }); const stoppedAt = api.reconcileCount;
-  await page.waitForTimeout(4_500); expect(api.reconcileCount).toBe(stoppedAt);
+  await page.getByRole("button", { name: "Actualiser l’état" }).click();
+  expect(api.readCount).toBe(2); expect(api.reconcileCount).toBe(0);
+  await page.goto("/library", { waitUntil: "networkidle" });
+  expect(api.reconcileCount).toBe(0);
 });
 
-test("desktop et mobile sans fuite, écriture vault ni session Apply", async ({ page }) => {
+test("écrans 320, 768, 1280 et 1600 sans fuite, écriture vault ni session Apply", async ({ page }) => {
   await mockQueueApi(page); const before = createHash("sha256").update(await readFile(path.join(vault, "INDEX.md"))).update(await readFile(path.join(vault, "02_SOURCES", "videos.md"))).digest("hex");
-  await page.setViewportSize({ width: 1440, height: 900 }); await open(page); await assertSafeResponsive(page);
-  await page.setViewportSize({ width: 390, height: 844 }); await open(page); await assertSafeResponsive(page);
+  for (const width of [320, 768, 1280, 1600]) { await page.setViewportSize({ width, height: 900 }); await open(page); await assertSafeResponsive(page); }
   const after = createHash("sha256").update(await readFile(path.join(vault, "INDEX.md"))).update(await readFile(path.join(vault, "02_SOURCES", "videos.md"))).digest("hex");
   expect(after).toBe(before);
   await expect(readdir(sessions)).rejects.toMatchObject({ code: "ENOENT" });

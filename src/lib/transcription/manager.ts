@@ -205,7 +205,10 @@ export class AcquisitionManager {
     await deleteJob(this.config, id);
   }
 
-  async get(id: string): Promise<AcquisitionJob> { return this.readonlyView(await loadJob(this.config, id)); }
+  async get(id: string): Promise<AcquisitionJob> {
+    await this.initialize();
+    return this.readonlyView(await loadJob(this.config, id));
+  }
   async list(): Promise<AcquisitionJob[]> { return (await listJobs(this.config)).map((job) => this.readonlyView(job)); }
 
   private enqueue(id: string, run: () => Promise<void>): void {

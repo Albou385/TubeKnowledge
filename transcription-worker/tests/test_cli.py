@@ -53,6 +53,35 @@ def test_ytdlp_rate_limit_has_a_stable_public_category(monkeypatch) -> None:
 
 
 @pytest.mark.parametrize(
+    ("stderr", "expected"),
+    [
+        ("ERROR: Sign in to confirm you’re not a bot", "AUTH_REQUIRED"),
+        ("ERROR: Video unavailable. This video is private", "VIDEO_UNAVAILABLE"),
+        ("ERROR: [youtube] Network is unreachable", "NETWORK_ERROR"),
+    ],
+)
+def test_ytdlp_failure_categories_are_actionable(monkeypatch, stderr: str, expected: str) -> None:
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 1, "", stderr),
+    )
+
+    with pytest.raises(cli.ToolExecutionError) as caught:
+        cli.run_tool(["python", "-m", "yt_dlp", "--skip-download"], 10, "YOUTUBE_ACCESS_FAILED")
+
+    assert caught.value.code == expected
+
+
+def test_whisper_metadata_keeps_auto_detected_language_without_translation() -> None:
+    metadata = cli._job_metadata(Path("fixture"), "Fixture", "local-whisper", "en")
+
+    assert metadata["language"] == "en"
+    assert metadata["detectedLanguage"] == "en"
+    assert metadata["transcriptionSource"] == "whisper"
+
+
+@pytest.mark.parametrize(
     ("language", "extension", "content"),
     [
         ("fr", "vtt", "WEBVTT\n\n00:00:00.000 --> 00:00:01.000\nBonjour\n"),
@@ -93,5 +122,7 @@ def test_download_subtitles_uses_system_certs_and_normalizes_tracks(
 
     metadata = json.loads((job_dir / "output" / "metadata.json").read_text(encoding="utf-8"))
     assert metadata["language"] == language
+    assert metadata["detectedLanguage"] == language
+    assert metadata["transcriptionSource"] == "automatic-subtitles"
     assert metadata["subtitleFormat"] == extension
     assert "transcript.txt" in result["artifacts"]

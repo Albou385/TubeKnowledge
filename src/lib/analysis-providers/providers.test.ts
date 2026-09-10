@@ -12,6 +12,7 @@ import type { AnalysisInput } from "./schema";
 
 const input: AnalysisInput = {
   workflowId: "11111111-1111-4111-8111-111111111111",
+  libraryLanguage: "fr",
   transcript: "Les agents IA utilisent des outils sous contrôle humain.",
   metadata: { title: "Agents IA", sourceUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ", videoId: "dQw4w9WgXcQ", language: "fr" },
   context: [{ relativePath: "01_BIBLIOTHEQUE/IA/agents.md", content: "# Agents\n", sha256: sha256("# Agents\n") }],
@@ -33,7 +34,7 @@ describe("fournisseurs d’analyse", () => {
     expect(first).toMatchObject({ status: "completed", provenance: { fixture: true } });
     expect(first.importZip?.equals(second.importZip!)).toBe(true);
     const parsed = await parseImportZip(first.importZip!);
-    expect(parsed.manifest.operations[0]).toMatchObject({ type: "create", path: "01_BIBLIOTHEQUE/Demonstration/analyse-fixture.md" });
+    expect(parsed.manifest.operations[0]).toMatchObject({ type: "create", path: "01_BIBLIOTHEQUE/Demonstration/Notions/analyse-fixture.md" });
     expect(parsed.manifest.packageId).toBe((await parseImportZip(second.importZip!)).manifest.packageId);
   });
 
@@ -49,6 +50,7 @@ describe("fournisseurs d’analyse", () => {
     const fetchImplementation = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
       expect(String(init?.headers && (init.headers as Record<string, string>).authorization)).toContain("secret-test");
       expect(JSON.parse(String(init?.body))).toMatchObject({ model: "fixture-model", store: false, max_output_tokens: 8_000 });
+      expect(String(init?.body)).toContain("libraryLanguage");
       return new Response(JSON.stringify({ output_text: JSON.stringify(draft) }), { status: 200 });
     });
     const provider = new OpenAIAnalysisProvider({ environment: { NODE_ENV: "test", TUBEKNOWLEDGE_ANALYSIS_PROVIDER: "openai", TUBEKNOWLEDGE_ENABLE_PAID_AI: "true", TUBEKNOWLEDGE_OPENAI_MODEL: "fixture-model", OPENAI_API_KEY: "secret-test" }, fetchImplementation, promptTemplate: "Retourne du JSON.", now: () => new Date("2026-07-27T05:00:00Z") });
@@ -57,6 +59,19 @@ describe("fournisseurs d’analyse", () => {
     expect((await parseImportZip(result.importZip!)).manifest.operations[0]).toMatchObject({ type: "create", path: "01_BIBLIOTHEQUE/IA/note.md" });
     expect(JSON.stringify(result)).not.toContain("secret-test");
     expect(fetchImplementation).toHaveBeenCalledTimes(1);
+  });
+
+  it("charge le contrat OpenAI public et borné par défaut", async () => {
+    const draft = { subject: "Agents IA", summary: "Résumé fixture", claims: [{ statement: "Affirmation", source: "video", citation: "transcript" }], proposedFiles: [{ type: "create", path: "01_BIBLIOTHEQUE/IA/note.md", content: "# Note\n" }], warnings: [] };
+    const fetchImplementation = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { input: Array<{ role: string; content: Array<{ text: string }> }> };
+      expect(body.input[0]?.content[0]?.text).toContain("MATCH_EXISTING");
+      expect(body.input[0]?.content[0]?.text).toContain("prompt injection");
+      expect(body.input[1]?.content[0]?.text).toContain("libraryLanguage");
+      return new Response(JSON.stringify({ output_text: JSON.stringify(draft) }), { status: 200 });
+    });
+    const environment: NodeJS.ProcessEnv = { NODE_ENV: "test", TUBEKNOWLEDGE_ANALYSIS_PROVIDER: "openai", TUBEKNOWLEDGE_ENABLE_PAID_AI: "true", TUBEKNOWLEDGE_OPENAI_MODEL: "fixture-model", OPENAI_API_KEY: "secret-test" };
+    await expect(new OpenAIAnalysisProvider({ environment, fetchImplementation }).run({ ...input, confirmedPaid: true })).resolves.toMatchObject({ status: "completed" });
   });
 
   it("supporte l’annulation sans requête", async () => {

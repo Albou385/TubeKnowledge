@@ -83,7 +83,7 @@ export class OpenAIAnalysisProvider implements AnalysisProvider {
       configured: config.configured,
       automatic: true,
       model: config.configured ? config.model : undefined,
-      reason: config.configured ? "Activation locale explicite; confirmation requise avant chaque requête." : "Désactivé par défaut. Fournisseur, dépense, modèle et clé doivent tous être configurés localement.",
+      reason: config.configured ? "Activation locale explicite; l’analyse automatique utilise cette configuration locale." : "Désactivé par défaut. Fournisseur, dépense, modèle et clé doivent tous être configurés localement.",
     };
   }
 
@@ -97,7 +97,7 @@ export class OpenAIAnalysisProvider implements AnalysisProvider {
     if (options.signal?.aborted) return { ...base, status: "canceled", publicErrorCode: "ANALYSIS_CANCELED" };
 
     const template = this.options.promptTemplate ?? await readFile(path.join(process.cwd(), "templates", "analysis", "OPENAI_ANALYSIS_PROMPT_V1.md"), "utf8");
-    const untrustedPayload = JSON.stringify({ metadata: input.metadata, transcript: input.transcript, context: input.context, writeScope: input.writeScope, freshnessHash: input.freshnessHash });
+    const untrustedPayload = JSON.stringify({ libraryLanguage: input.libraryLanguage, metadata: input.metadata, transcript: input.transcript, context: input.context, writeScope: input.writeScope, freshnessHash: input.freshnessHash });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     const abort = () => controller.abort();

@@ -25,6 +25,7 @@ export default defineConfig({
       TUBEKNOWLEDGE_QA_ROOT: qaRoot,
       YOUTUBE_LIBRARY_PATH: path.join(qaRoot, "vault"),
       TUBEKNOWLEDGE_RUNTIME_PATH: path.join(qaRoot, "runtime"),
+      TUBEKNOWLEDGE_IMPORT_SESSION_PATH: path.join(qaRoot, "import-sessions"),
       TUBEKNOWLEDGE_PORTABILITY_STATE_PATH: path.join(qaRoot, "state"),
       TUBEKNOWLEDGE_BACKUP_PATH: path.join(qaRoot, "backups"),
       TUBEKNOWLEDGE_ONEDRIVE_ROOT: path.join(qaRoot, "vault"),

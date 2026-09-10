@@ -25,11 +25,12 @@ function nodeHref(node: LibraryNode): string {
   return node.type === "file" ? `/library/${encoded}` : `/browse/${encoded}`;
 }
 
-function semanticLabel(node: LibraryNode): string {
-  const segments = node.relativePath.split("/");
-  if (segments[0] !== "01_BIBLIOTHEQUE") return node.type === "directory" ? "Dossier" : "Document";
-  if (node.type === "directory") return segments.length === 2 ? "Domaine" : segments.length === 3 ? "Sujet" : "Dossier";
-  return node.name.toLocaleLowerCase("fr") === "index.md" ? "Index" : "Notion";
+function visibleChildren(directory: Extract<LibraryNode, { type: "directory" }>): LibraryNode[] {
+  return directory.children.filter((node) => node.type === "directory" || node.name.toLocaleLowerCase("fr") !== "index.md");
+}
+
+function breadcrumbName(part: string): string | null {
+  return part === "01_BIBLIOTHEQUE" ? null : part;
 }
 
 export default async function BrowsePage({ params }: BrowsePageProps) {
@@ -48,9 +49,9 @@ export default async function BrowsePage({ params }: BrowsePageProps) {
     <LibraryShell tree={library.tree}>
       <div className="mx-auto max-w-5xl">
         <nav aria-label="Fil d’Ariane" className="mb-6 flex flex-wrap gap-2 text-sm text-slate-500">
-          <Link href="/" className="hover:text-cyan-600">Accueil</Link>
+          <Link href="/library" className="hover:text-cyan-600">Bibliothèque</Link>
           {relativePath.split("/").filter(Boolean).map((part, index, parts) => (
-            <span key={`${part}:${index}`}>/ <Link className="hover:text-cyan-600" href={`/browse/${parts.slice(0, index + 1).map(encodeURIComponent).join("/")}`}>{part}</Link></span>
+            breadcrumbName(part) ? <span key={`${part}:${index}`}>/ <Link className="hover:text-cyan-600" href={`/browse/${parts.slice(0, index + 1).map(encodeURIComponent).join("/")}`}>{part}</Link></span> : null
           ))}
         </nav>
         {!directory ? (
@@ -59,19 +60,16 @@ export default async function BrowsePage({ params }: BrowsePageProps) {
           </div>
         ) : (
           <>
-            <p className="text-xs font-semibold tracking-[0.16em] text-cyan-600 uppercase">{semanticLabel(directory)} Markdown</p>
-            <h1 className="mt-2 text-3xl font-bold">{directory.name}</h1>
-            <p className="mt-2 text-sm text-slate-500">{directory.relativePath}</p>
-            {directory.children.length > 0 ? (
+            <h1 className="text-3xl font-bold break-words">{directory.name}</h1>
+            {visibleChildren(directory).length > 0 ? (
               <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                {directory.children.map((node) => (
+                {visibleChildren(directory).map((node) => (
                   <Link key={node.relativePath} href={nodeHref(node)} className="rounded-xl border border-slate-200 bg-white p-4 hover:border-cyan-500 dark:border-slate-800 dark:bg-slate-900">
-                    <span className="text-xs text-slate-500">{semanticLabel(node)}</span>
-                    <strong className="mt-1 block">{node.name.replace(/\.md$/i, "")}</strong>
+                    <strong className="block break-words">{node.name.replace(/\.md$/i, "")}</strong>
                   </Link>
                 ))}
               </div>
-            ) : <p className="mt-7 rounded-xl border border-dashed border-slate-300 p-5 text-slate-500 dark:border-slate-700">Ce dossier ne contient aucun document Markdown visible.</p>}
+            ) : <p className="mt-7 rounded-xl border border-dashed border-slate-300 p-5 text-slate-500 dark:border-slate-700">Aucune notion n’est encore disponible ici.</p>}
           </>
         )}
       </div>

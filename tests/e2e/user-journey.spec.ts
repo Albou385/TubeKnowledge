@@ -111,13 +111,14 @@ test.describe.configure({ mode: "serial" });
 
 test("bibliothèque — la navigation de lecture expose les domaines et les notions de la fixture", async ({ page }) => {
   await open(page, "/library");
-  await expect(page.getByRole("heading", { name: "Domaines, sujets et notions" })).toBeVisible();
-  await expect(page.getByText("Domaine", { exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Domaines" })).toBeVisible();
   const domain = page.getByRole("link", { name: "Astronomie" }).first();
   await expect(domain).toBeVisible();
-  await expect(page.getByRole("link", { name: "Observer le ciel" }).first()).toBeVisible();
   await domain.click();
-  await expect(page.getByText("Domaine Markdown", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Astronomie" })).toBeVisible();
+  await page.getByRole("link", { name: "Observation" }).click();
+  await expect(page.getByRole("heading", { name: "Observation" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "observer-le-ciel" }).first()).toBeVisible();
 });
 
 test("A — une vidéo traverse les vrais écrans jusqu’à une citation ouvrable", async ({ page }) => {
@@ -125,9 +126,9 @@ test("A — une vidéo traverse les vrais écrans jusqu’à une citation ouvrab
   await activateTemporaryWriter(value);
 
   await open(page, "/");
-  await page.getByRole("link", { name: "Ajouter une vidéo" }).click();
-  await expect(page.getByRole("heading", { name: "Ajouter une vidéo" })).toBeVisible();
-  await expect(page.getByLabel("URL de la vidéo YouTube")).toBeVisible();
+  await page.getByRole("link", { name: "Ajouter" }).first().click();
+  await expect(page.getByRole("heading", { name: "Ajouter des vidéos", level: 1 })).toBeVisible();
+  await expect(page.getByLabel("URLs YouTube")).toBeVisible();
 
   // Les étapes externes sont déjà inspectées dans la fixture. Les écrans, liens,
   // Preview et Apply restent ceux de l’application en cours d’exécution.
@@ -144,12 +145,12 @@ test("A — une vidéo traverse les vrais écrans jusqu’à une citation ouvrab
 
   await previewAndApply(page, value);
   await page.getByRole("link", { name: "Retrouver les connaissances" }).click();
-  await expect(page.getByRole("heading", { name: /Transformez une vidéo/i })).toBeVisible();
+  await open(page, "/library");
   await page.locator("#global-search").fill("horizon");
   await page.getByRole("button", { name: "Chercher" }).click();
   await expect(page.getByText(/résultat/)).toBeVisible();
 
-  await page.getByRole("link", { name: "Poser une question" }).first().click();
+  await open(page, "/ask");
   await page.locator("#library-question").fill("Quels repères aident à observer le ciel ?");
   await page.getByRole("button", { name: "Interroger la bibliothèque" }).click();
   await expect(page.getByRole("heading", { name: "Réponse fondée sur les sources" })).toBeVisible();
@@ -162,33 +163,33 @@ test("A — une vidéo traverse les vrais écrans jusqu’à une citation ouvrab
 test("B — file déterministe de 10 URL : concurrence 1, pause, reprise, annulation, retry et persistance simulée", async ({ page }) => {
   const api = await mockDeterministicQueue(page);
   await open(page, "/video-queue");
-  await expect(page.getByText("File locale · concurrence 1")).toBeVisible();
+  await expect(page.getByText("Les vidéos sont traitées une à la fois.")).toBeVisible();
   const urls = [
     "https://www.youtube.com/watch?v=valid000000", "https://www.youtube.com/watch?v=valid000001", "https://www.youtube.com/watch?v=valid000002",
     "https://www.youtube.com/watch?v=valid000003", "https://www.youtube.com/watch?v=valid000004", "https://www.youtube.com/watch?v=valid000005",
     "https://www.youtube.com/watch?v=valid000000", "https://youtu.be/valid000001", "pas-une-url", "https://www.youtube.com/watch?v=inaccess001",
   ];
-  await page.getByLabel("URLs YouTube, une par ligne").fill(urls.join("\n"));
-  const add = page.getByRole("button", { name: "Ajouter à la file" });
+  await page.getByLabel("URLs YouTube").fill(urls.join("\n"));
+  const add = page.getByRole("button", { name: "Ajouter" });
   await add.evaluate((button: HTMLButtonElement) => { button.click(); button.click(); });
   await expect(page.getByRole("heading", { name: "Résultat de l’ajout" })).toBeVisible();
   for (const label of ["Vidéos ajoutées", "Doublons dans la soumission", "URL invalide"]) await expect(page.getByText(new RegExp(`^${label}`))).toBeVisible();
   expect(api.addCalls).toBe(1);
 
   await page.getByRole("button", { name: "Mettre en pause" }).click();
-  await expect(page.getByText("File mise en pause. L’opération active peut se terminer.")).toBeVisible();
-  await page.getByRole("button", { name: "Reprendre la file" }).click();
-  await expect(page.getByText("File reprise. L’état est réconcilié avant le prochain départ.")).toBeVisible();
+  await expect(page.getByText("Traitement mis en pause.")).toBeVisible();
+  await page.getByRole("button", { name: "Reprendre" }).click();
+  await expect(page.getByText("Traitement repris.")).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await page.locator('[data-queue-state="queued"]').first().getByRole("button", { name: "Annuler" }).click();
   await expect(page.getByText("Élément annulé. Les connaissances existantes sont conservées.")).toBeVisible();
   await page.locator('[data-queue-state="failed"]').first().getByRole("button", { name: "Réessayer" }).click();
-  await expect(page.getByText("Nouvelle tentative lancée sur le même traitement.")).toBeVisible();
+  await expect(page.getByText("Nouvelle tentative lancée.")).toBeVisible();
 
   await page.reload({ waitUntil: "networkidle" });
   await expect(page.getByText("Annulée", { exact: true })).toBeVisible();
   await expect(page.locator('[data-queue-state="queued"]')).not.toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Choisir la transcription" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Vérifier" })).toBeVisible();
 });
 
 test("C — les échecs exposent une action suivante sans atteindre le vrai vault", async ({ page }) => {

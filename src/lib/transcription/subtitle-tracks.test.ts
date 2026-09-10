@@ -21,4 +21,8 @@ describe("pistes de sous-titres du workflow", () => {
   it("garde toutes les pistes quand l’utilisateur demande les autres langues", () => {
     expect(visibleWorkflowSubtitleTracks([automaticEnglish, manualSpecialized, automaticFrench], true)).toHaveLength(3);
   });
+
+  it("privilégie la langue originale détectée avant les préférences de l’interface", () => {
+    expect(recommendedSubtitleTrack([automaticFrench, automaticEnglish], "en-US")).toEqual(automaticEnglish);
+  });
 });

@@ -43,11 +43,17 @@ def _yt_dlp_failure(stderr: str, fallback_code: str) -> ToolExecutionError:
         return ToolExecutionError("YOUTUBE_ACCESS_FAILED", "La connexion sécurisée à YouTube n’a pas pu être validée.")
     if "http error 429" in lowered or "too many requests" in lowered:
         return ToolExecutionError("YOUTUBE_RATE_LIMITED", "YouTube limite temporairement les requêtes de sous-titres.")
+    if any(marker in lowered for marker in ("sign in to confirm", "confirm you’re not a bot", "confirm you're not a bot", "login required", "cookies")):
+        return ToolExecutionError("AUTH_REQUIRED", "YouTube demande une authentification pour cette vidéo publique.")
+    if any(marker in lowered for marker in ("video unavailable", "private video", "this video is not available", "video has been removed", "does not exist")):
+        return ToolExecutionError("VIDEO_UNAVAILABLE", "Cette vidéo n’est plus disponible publiquement.")
+    if any(marker in lowered for marker in ("network is unreachable", "name or service not known", "temporary failure in name resolution", "connection timed out", "connection reset", "unable to download api page")):
+        return ToolExecutionError("NETWORK_ERROR", "La connexion réseau à YouTube a échoué. Vérifiez le réseau puis réessayez.")
     if "requested subtitles" in lowered and ("not available" in lowered or "not found" in lowered):
         return ToolExecutionError("SUBTITLE_NOT_AVAILABLE", "La piste de sous-titres demandée n’est plus disponible.")
     if "no subtitles" in lowered or "does not have subtitles" in lowered:
         return ToolExecutionError("SUBTITLE_NOT_AVAILABLE", "La piste de sous-titres demandée n’est plus disponible.")
-    if any(marker in lowered for marker in ("http error 403", "sign in", "video unavailable", "unable to download api page")):
+    if any(marker in lowered for marker in ("http error 403", "sign in")):
         return ToolExecutionError("YOUTUBE_ACCESS_FAILED", "YouTube a refusé ou interrompu l’accès à la ressource demandée.")
     return ToolExecutionError(fallback_code, "L’outil externe n’a pas pu terminer l’opération demandée.")
 
@@ -177,6 +183,8 @@ def _job_metadata(job_dir: Path, title: str, source_kind: str, language: str | N
         "title": title,
         "sourceKind": source_kind,
         "language": language or "und",
+        "detectedLanguage": language or "und",
+        "transcriptionSource": "whisper" if source_kind == "local-whisper" else source_kind,
         "warnings": [],
     }
     for key in ("videoId", "canonicalUrl"):
