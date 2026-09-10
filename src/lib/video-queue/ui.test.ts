@@ -37,7 +37,7 @@ describe("présentation de la file vidéo", () => {
 
   it("présente exactement les dix états humains attendus", () => {
     expect(Object.keys(VIDEO_QUEUE_STATE_LABELS)).toEqual(states);
-    expect(Object.values(VIDEO_QUEUE_STATE_LABELS)).toEqual(["En attente", "Inspection", "Transcription", "Transcript prêt", "Analyse requise", "Résultat prêt à vérifier", "Ajoutée à la bibliothèque", "En pause", "Annulée", "Échec"]);
+    expect(Object.values(VIDEO_QUEUE_STATE_LABELS)).toEqual(["En attente", "Inspection", "Transcription", "Analyse", "Analyse", "Vérification nécessaire", "Terminé", "En pause", "Annulée", "Échec"]);
   });
 
   it.each(states)("fournit une prochaine action humaine pour %s", (state) => {
@@ -45,8 +45,8 @@ describe("présentation de la file vidéo", () => {
   });
 
   it("distingue la pause globale de la décision de transcription", () => {
-    expect(queueNextAction(item("paused", { pauseReason: "source-selection-required", resumeState: "transcribing" }))).toContain("Choisir la transcription");
-    expect(workflowActionLabel(item("paused", { pauseReason: "source-selection-required", resumeState: "transcribing" }))).toBe("Choisir la transcription");
+    expect(queueNextAction(item("paused", { pauseReason: "source-selection-required", resumeState: "transcribing" }))).toContain("Vérification nécessaire");
+    expect(workflowActionLabel(item("paused", { pauseReason: "source-selection-required", resumeState: "transcribing" }))).toBe("Vérifier");
   });
 
   it("regroupe les six résultats de soumission sans exposer d’identifiant", () => {

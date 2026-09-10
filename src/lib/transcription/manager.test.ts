@@ -94,7 +94,7 @@ describe("reprise du manager d’acquisition", () => {
       { NODE_ENV: "test" },
       (() => ({ promise: Promise.resolve({ result: {}, stderr: "" }), cancel: async () => undefined })) as typeof import("./worker-process").runWorkerProcess,
     );
-    await manager.initialize();
+    await expect(manager.get(job.id)).resolves.toMatchObject({ id: job.id, status: "interrupted", error: { code: "TRANSCRIPTION_INTERRUPTED" } });
     const interrupted = await loadJob(config, job.id);
     expect(interrupted).toMatchObject({ status: "interrupted", error: { code: "TRANSCRIPTION_INTERRUPTED" } });
     await expect(manager.resume(job.id)).resolves.toMatchObject({ id: job.id });

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { LibraryEnvironment } from "@/lib/config/library-config";
 import { getAcquisitionManager, type AcquisitionManager } from "@/lib/transcription/manager";
 import { validateYoutubeUrl } from "@/lib/transcription/youtube-url";
+import { advanceSimpleModeWorkflow } from "@/lib/simple-mode/automation";
 import {
   cancelVideoKnowledgeWorkflow,
   createVideoKnowledgeWorkflow,
@@ -11,6 +12,7 @@ import {
   loadWorkflow,
   resumeWorkflowAcquisition,
   synchronizeWorkflow,
+  updateWorkflow,
   type WorkflowDuplicate,
   type WorkflowOrchestratorOptions,
 } from "@/lib/workflows/orchestrator";
@@ -23,6 +25,7 @@ import {
   hashQueueRequest,
   loadVideoQueueStore,
   videoQueueRuntimePath,
+  acquireVideoQueueRunnerLock,
   withLockedVideoQueue,
 } from "./runtime";
 import {
@@ -66,6 +69,8 @@ export interface QueueWorkflowAdapter {
   synchronize(workflowId: string): Promise<VideoKnowledgeWorkflow>;
   retry(workflowId: string): Promise<VideoKnowledgeWorkflow>;
   cancel(workflowId: string): Promise<VideoKnowledgeWorkflow>;
+  advance?(workflowId: string): Promise<VideoKnowledgeWorkflow>;
+  interruptAnalysis?(workflowId: string): Promise<VideoKnowledgeWorkflow>;
 }
 
 export interface VideoQueueEngineOptions {
@@ -77,6 +82,7 @@ export interface VideoQueueEngineOptions {
   adapter?: QueueWorkflowAdapter;
   now?: () => Date;
   autoProcess?: boolean;
+  runnerIntervalMs?: number;
 }
 
 function publicSnapshot(store: VideoQueueStore): VideoQueueSnapshot {
@@ -100,6 +106,7 @@ function isMissingWorkflow(error: unknown): boolean {
 
 function workflowState(workflow: VideoKnowledgeWorkflow): { state: VideoQueueItemState; pauseReason?: "source-selection-required" } {
   if (workflow.state === "draft" || workflow.state === "inspecting") return { state: "inspecting" };
+  if (workflow.lastErrorCode && workflow.state !== "failed") return { state: "result-ready" };
   if (workflow.state === "source-selection") return { state: "paused", pauseReason: "source-selection-required" };
   if (workflow.state === "acquiring") return { state: "transcribing" };
   if (workflow.state === "transcript-ready") return { state: "transcript-ready" };
@@ -126,6 +133,11 @@ function defaultAdapter(options: VideoQueueEngineOptions): QueueWorkflowAdapter 
     inspect: (workflowId) => inspectVideoKnowledgeWorkflow(workflowId, base),
     load: (workflowId) => loadWorkflow(workflowId, options.workflowRoot),
     synchronize: (workflowId) => synchronizeWorkflow(workflowId, base),
+    advance: (workflowId) => advanceSimpleModeWorkflow(workflowId, processEnvironment),
+    interruptAnalysis: (workflowId) => updateWorkflow(workflowId, {
+      lastErrorCode: "AI_ANALYSIS_INTERRUPTED",
+      nextAction: "Vérification nécessaire : relancez explicitement l’analyse automatique.",
+    }, { root: options.workflowRoot, now: options.now?.() }),
     retry: async (workflowId) => {
       const workflow = await loadWorkflow(workflowId, options.workflowRoot);
       return workflow.acquisitionId ? resumeWorkflowAcquisition(workflowId, base) : inspectVideoKnowledgeWorkflow(workflowId, base);
@@ -139,13 +151,18 @@ export class VideoQueueEngine {
   private readonly adapter: QueueWorkflowAdapter;
   private readonly now: () => Date;
   private readonly autoProcess: boolean;
+  private readonly runnerIntervalMs: number;
   private processing: Promise<void> | null = null;
+  private runnerTimer: ReturnType<typeof setTimeout> | null = null;
+  private runnerEnabled = false;
+  private runnerInFlight: Promise<void> | null = null;
 
   constructor(options: VideoQueueEngineOptions = {}) {
     this.root = options.root ?? videoQueueRuntimePath(options.processEnvironment);
     this.adapter = options.adapter ?? defaultAdapter(options);
     this.now = options.now ?? (() => new Date());
     this.autoProcess = options.autoProcess ?? true;
+    this.runnerIntervalMs = options.runnerIntervalMs ?? 1_000;
   }
 
   async snapshot(): Promise<VideoQueueSnapshot> {
@@ -296,29 +313,59 @@ export class VideoQueueEngine {
   }
 
   async reconcile(input: unknown): Promise<VideoQueueSnapshot> {
-    const request = idempotentCommandSchema.parse(input);
-    const before = await this.snapshot();
-    const workflows = new Map<string, VideoKnowledgeWorkflow>();
-    for (const item of before.items) {
-      if (!item.workflowId || ["cancelled", "imported"].includes(item.state)) continue;
-      try { workflows.set(item.itemId, await this.adapter.synchronize(item.workflowId)); }
-      catch { /* L’état existant reste intact; aucune erreur interne n’est persistée ni exposée. */ }
-    }
-    const result = await this.command(request.idempotencyKey, "reconcile", {}, (store) => {
-      for (const item of store.items) {
-        const workflow = workflows.get(item.itemId);
-        if (workflow) this.applyWorkflow(store, item, workflow, "WORKFLOW_RECONCILED");
-      }
-      return publicSnapshot(store);
-    }, { persist: () => ({}), replay: (_value, store) => publicSnapshot(store) });
+    // Cette ancienne commande reste compatible côté API, mais elle ne peut plus
+    // faire avancer un workflow dans le contexte d'une page. Le runner verrouillé
+    // est la seule autorité de progression.
+    idempotentCommandSchema.parse(input);
     if (this.autoProcess) void this.start();
-    return result;
+    return this.snapshot();
   }
 
   async start(): Promise<void> {
     if (this.processing) return this.processing;
-    this.processing = this.runLoop().finally(() => { this.processing = null; });
+    this.processing = this.runWithRunnerLock().finally(() => { this.processing = null; });
     return this.processing;
+  }
+
+  private async runWithRunnerLock(): Promise<void> {
+    const lock = await acquireVideoQueueRunnerLock(this.root, this.now);
+    if (!lock) return;
+    try { await this.runLoop(); }
+    finally { await lock.release(); }
+  }
+
+  /** Démarre le moteur serveur; il n'est relié ni à une page ni à un navigateur. */
+  startBackgroundRunner(): void {
+    if (this.runnerEnabled) return;
+    this.runnerEnabled = true;
+    const tick = async (): Promise<void> => {
+      try {
+        await this.start();
+      } catch {
+        // Les erreurs métier sont persistées par la boucle; un verrou temporaire
+        // laisse simplement le prochain tick reprendre la main.
+      } finally {
+        if (this.runnerEnabled) {
+          this.runnerTimer = setTimeout(() => { this.scheduleRunnerTick(tick); }, this.runnerIntervalMs);
+          this.runnerTimer.unref?.();
+        }
+      }
+    };
+    this.scheduleRunnerTick(tick);
+  }
+
+  async stopBackgroundRunner(): Promise<void> {
+    this.runnerEnabled = false;
+    if (this.runnerTimer) clearTimeout(this.runnerTimer);
+    this.runnerTimer = null;
+    await this.runnerInFlight;
+  }
+
+  private scheduleRunnerTick(tick: () => Promise<void>): void {
+    const running = tick().finally(() => {
+      if (this.runnerInFlight === running) this.runnerInFlight = null;
+    });
+    this.runnerInFlight = running;
   }
 
   private async recoverAfterRestart(): Promise<void> {
@@ -330,6 +377,7 @@ export class VideoQueueEngine {
     }
     let workflow: VideoKnowledgeWorkflow | null = null;
     try { workflow = await this.adapter.load(active.workflowId ?? active.itemId); } catch { /* crash possible avant création du workflow */ }
+    if (workflow?.state === "analysis-preparing" && this.adapter.interruptAnalysis) workflow = await this.adapter.interruptAnalysis(workflow.workflowId);
     await withLockedVideoQueue((store) => {
       const item = store.items.find((entry) => entry.itemId === active.itemId);
       if (!item) return { store: { ...store, activeItemId: null }, value: undefined };
@@ -338,7 +386,11 @@ export class VideoQueueEngine {
         this.applyWorkflow(store, item, workflow, "RESTART_RECOVERY");
         if (workflow.state === "draft" || workflow.state === "inspecting") this.transition(store, item, "queued", "RESTART_REQUEUED");
       } else if (item.state === "inspecting") this.transition(store, item, "queued", "RESTART_REQUEUED");
-      store.activeItemId = ["inspecting", "transcribing"].includes(item.state) ? item.itemId : null;
+      // Seules les étapes déterministes sont reprises automatiquement. Une analyse
+      // interrompue reste explicitement vérifiable, sans rejouer un Apply commité.
+      const resumableInterrupted = workflow?.state === "failed" && workflow.lastErrorCode === "TRANSCRIPTION_INTERRUPTED";
+      const resumableAutomaticStep = workflow?.state === "source-selection" || workflow?.state === "transcript-ready";
+      store.activeItemId = resumableInterrupted || resumableAutomaticStep || ["inspecting", "transcribing"].includes(item.state) ? item.itemId : null;
       return { store, value: undefined };
     }, { root: this.root, now: this.now });
   }
@@ -346,6 +398,11 @@ export class VideoQueueEngine {
   private async runLoop(): Promise<void> {
     await this.recoverAfterRestart();
     while (true) {
+      const advanced = await this.advanceActiveItem();
+      if (advanced) {
+        if ((await this.snapshot()).activeItemId) return;
+        continue;
+      }
       const item = await withLockedVideoQueue((store) => {
         if (store.paused || store.activeItemId) return { store, value: null as VideoQueueItem | null };
         const next = store.items.find((entry) => entry.state === "queued");
@@ -370,10 +427,10 @@ export class VideoQueueEngine {
         return { store, value: undefined };
       }, { root: this.root, now: this.now });
       workflow = await this.adapter.inspect(workflow.workflowId);
+      if (this.adapter.advance) workflow = await this.adapter.advance(workflow.workflowId);
       await withLockedVideoQueue((store) => {
         const item = store.items.find((entry) => entry.itemId === claimed.itemId);
         if (item && item.state !== "cancelled") this.applyWorkflow(store, item, workflow, "INSPECTION_COMPLETED");
-        if (store.activeItemId === claimed.itemId) store.activeItemId = null;
         return { store, value: undefined };
       }, { root: this.root, now: this.now });
     } catch (error) {
@@ -384,6 +441,42 @@ export class VideoQueueEngine {
         return { store, value: undefined };
       }, { root: this.root, now: this.now });
     }
+  }
+
+  private async advanceActiveItem(): Promise<boolean> {
+    const snapshot = await this.snapshot();
+    const active = snapshot.activeItemId ? snapshot.items.find((item) => item.itemId === snapshot.activeItemId) : undefined;
+    if (!active) return false;
+    if (!active.workflowId) {
+      await withLockedVideoQueue((store) => {
+        const item = store.items.find((entry) => entry.itemId === active.itemId);
+        if (item) this.transition(store, item, "failed", "RUNNER_WORKFLOW_MISSING", { lastErrorCode: "QUEUE_WORKFLOW_MISSING" });
+        if (store.activeItemId === active.itemId) store.activeItemId = null;
+        return { store, value: undefined };
+      }, { root: this.root, now: this.now });
+      return true;
+    }
+    try {
+      let workflow = await this.adapter.synchronize(active.workflowId);
+      if (workflow.state === "failed" && workflow.lastErrorCode === "TRANSCRIPTION_INTERRUPTED") {
+        workflow = await this.adapter.retry(workflow.workflowId);
+      } else if (this.adapter.advance) {
+        workflow = await this.adapter.advance(workflow.workflowId);
+      }
+      await withLockedVideoQueue((store) => {
+        const item = store.items.find((entry) => entry.itemId === active.itemId);
+        if (item && item.state !== "cancelled") this.applyWorkflow(store, item, workflow, "BACKGROUND_RECONCILED");
+        return { store, value: undefined };
+      }, { root: this.root, now: this.now });
+    } catch (error) {
+      await withLockedVideoQueue((store) => {
+        const item = store.items.find((entry) => entry.itemId === active.itemId);
+        if (item && item.state !== "cancelled") this.transition(store, item, "failed", "BACKGROUND_FAILED", { lastErrorCode: safeFailureCode(error, "QUEUE_BACKGROUND_FAILED") });
+        if (store.activeItemId === active.itemId) store.activeItemId = null;
+        return { store, value: undefined };
+      }, { root: this.root, now: this.now });
+    }
+    return true;
   }
 
   private applyWorkflow(store: VideoQueueStore, item: VideoQueueItem, workflow: VideoKnowledgeWorkflow, reasonCode: string): void {

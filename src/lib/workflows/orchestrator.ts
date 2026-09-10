@@ -90,7 +90,8 @@ export async function inspectVideoKnowledgeWorkflow(id: string, options: Workflo
       lastErrorCode: undefined,
     }, { root: context.root, now: context.now() });
   } catch (error) {
-    await transitionWorkflow(id, "failed", { lastErrorCode: "INSPECTION_FAILED" }, { root: context.root, now: context.now() });
+    const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "INSPECTION_FAILED";
+    await transitionWorkflow(id, "failed", { lastErrorCode: code }, { root: context.root, now: context.now() });
     throw new WorkflowError("INSPECTION_FAILED", { cause: error });
   }
 }
@@ -103,7 +104,8 @@ export async function startWorkflowAcquisition(id: string, source: unknown, opti
     const job = await context.manager.start({ jobId: workflow.acquisitionId, source });
     return transitionWorkflow(id, "acquiring", { title: job.title ?? workflow.title, lastErrorCode: undefined }, { root: context.root, now: context.now() });
   } catch (error) {
-    await transitionWorkflow(id, "failed", { lastErrorCode: "ACQUISITION_FAILED" }, { root: context.root, now: context.now() });
+    const code = error && typeof error === "object" && "code" in error && typeof error.code === "string" ? error.code : "ACQUISITION_FAILED";
+    await transitionWorkflow(id, "failed", { lastErrorCode: code }, { root: context.root, now: context.now() });
     throw new WorkflowError("ACQUISITION_FAILED", { cause: error });
   }
 }

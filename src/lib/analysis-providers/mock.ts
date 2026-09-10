@@ -36,7 +36,7 @@ export class MockAnalysisProvider implements AnalysisProvider {
   async run(rawInput: AnalysisInput, options: { signal?: AbortSignal } = {}): Promise<AnalysisProviderResult> {
     const input = analysisInputSchema.parse(rawInput);
     if (options.signal?.aborted) return this.canceled(input);
-    const targetPath = "01_BIBLIOTHEQUE/Demonstration/analyse-fixture.md";
+    const targetPath = "01_BIBLIOTHEQUE/Demonstration/Notions/analyse-fixture.md";
     const content = `# Analyse de démonstration\n\n> Fixture locale — aucun fournisseur externe n’a été appelé.\n\n## Sujet\n\n${input.metadata.title}\n\n## Point vérifiable\n\nLe transcript de démonstration contient ${input.transcript.trim().split(/\s+/u).filter(Boolean).length} mots.\n\n## Source\n\nVidéo ${input.metadata.videoId}.\n`;
     const draft = analysisDraftSchema.parse({
       subject: `Démonstration — ${input.metadata.title}`,

@@ -122,6 +122,7 @@ await Promise.all([
 
 const mock = await new MockAnalysisProvider(() => new Date(now), () => "60000000-0000-4000-8000-000000000001").run({
   workflowId: ids.transcript,
+  libraryLanguage: "fr",
   transcript: "Une carte du ciel et un horizon dégagé aident à observer les constellations.",
   metadata: { title: "Observer le ciel", sourceUrl: "https://example.test/astronomie", videoId: "fixture-astronomie", language: "fr" },
   context: [], writeScope: { createPrefixes: ["01_BIBLIOTHEQUE/"], replaceFiles: [] }, freshnessHash: "a".repeat(64), confirmedPaid: false,

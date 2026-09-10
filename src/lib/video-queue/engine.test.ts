@@ -85,6 +85,27 @@ class FakeWorkflowAdapter implements QueueWorkflowAdapter {
   }
 }
 
+class BackgroundWorkflowAdapter extends FakeWorkflowAdapter {
+  async advance(workflowId: string) {
+    const current = await this.load(workflowId);
+    const value = current.state === "source-selection"
+      ? workflow(workflowId, current.sourceUrl, "acquiring", { acquisitionId: "22222222-2222-4222-8222-222222222222" })
+      : current.state === "acquiring"
+        ? workflow(workflowId, current.sourceUrl, "imported", { acquisitionId: current.acquisitionId, importId: "33333333-3333-4333-8333-333333333333" })
+        : current;
+    this.workflows.set(workflowId, value);
+    return value;
+  }
+}
+
+async function waitFor(check: () => Promise<boolean>, timeoutMs = 1_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!(await check())) {
+    if (Date.now() >= deadline) throw new Error("Délai d’attente de fixture dépassé.");
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 async function add(engine: VideoQueueEngine, urls = [firstUrl], key = "command:add:0001") {
   return engine.add({ idempotencyKey: key, urls });
 }
@@ -133,6 +154,64 @@ describe("moteur local persistant de file vidéo", () => {
     expect(adapter.maxInFlight).toBe(1);
     expect(adapter.calls.inspect).toBe(2);
     expect((await engine.snapshot()).items.every((item) => item.state === "paused" && item.pauseReason === "source-selection-required")).toBe(true);
+  });
+
+  it("sérialise deux runners de processus sur le même stockage", async () => {
+    const root = await tempRoot(); const adapter = new FakeWorkflowAdapter();
+    const first = new VideoQueueEngine({ root, adapter, autoProcess: false });
+    const second = new VideoQueueEngine({ root, adapter, autoProcess: false });
+    await add(first, [firstUrl]);
+    await Promise.all([first.start(), second.start()]);
+    expect(adapter.calls.inspect).toBe(1);
+    expect(adapter.maxInFlight).toBe(1);
+  });
+
+  it("continue la file côté serveur sans appel Reconcile de la page", async () => {
+    const root = await tempRoot(); const adapter = new BackgroundWorkflowAdapter();
+    const engine = new VideoQueueEngine({ root, adapter, autoProcess: false, runnerIntervalMs: 10 });
+    await add(engine, [firstUrl, secondUrl]);
+    engine.startBackgroundRunner();
+    await waitFor(async () => (await engine.snapshot()).items.every((item) => item.state === "imported"));
+    await engine.stopBackgroundRunner();
+    expect(adapter.maxInFlight).toBe(1);
+    expect(adapter.calls.inspect).toBe(2);
+  });
+
+  it("reprend une acquisition interrompue après redémarrage sans double création", async () => {
+    const root = await tempRoot(); const adapter = new FakeWorkflowAdapter();
+    const submitted = await add(new VideoQueueEngine({ root, adapter, autoProcess: false }));
+    const itemId = submitted.results[0].itemId!;
+    adapter.workflows.set(itemId, workflow(itemId, firstUrl, "failed", {
+      acquisitionId: "22222222-2222-4222-8222-222222222222", lastErrorCode: "TRANSCRIPTION_INTERRUPTED",
+    }));
+    const store = await loadVideoQueueStore(root);
+    store.items[0] = { ...store.items[0], workflowId: itemId, state: "transcribing" };
+    store.activeItemId = itemId;
+    await saveVideoQueueStore(store, root);
+    const restarted = new VideoQueueEngine({ root, adapter, autoProcess: false, runnerIntervalMs: 10 });
+    restarted.startBackgroundRunner();
+    await waitFor(async () => adapter.calls.retry === 1 && (await restarted.snapshot()).items[0]?.state === "transcribing");
+    await restarted.stopBackgroundRunner();
+    expect(adapter.calls.create).toBe(0);
+    expect((await restarted.snapshot()).items[0]).toMatchObject({ state: "transcribing", workflowId: itemId });
+  });
+
+  it("reprend une étape automatique persistée après fermeture de la page", async () => {
+    const root = await tempRoot(); const adapter = new BackgroundWorkflowAdapter();
+    const submitted = await add(new VideoQueueEngine({ root, adapter, autoProcess: false }));
+    const itemId = submitted.results[0].itemId!;
+    adapter.workflows.set(itemId, workflow(itemId, firstUrl, "source-selection", {
+      acquisitionId: "22222222-2222-4222-8222-222222222222",
+    }));
+    const store = await loadVideoQueueStore(root);
+    store.items[0] = { ...store.items[0], workflowId: itemId, state: "paused", pauseReason: "source-selection-required", resumeState: "transcribing" };
+    store.activeItemId = itemId;
+    await saveVideoQueueStore(store, root);
+    const restarted = new VideoQueueEngine({ root, adapter, autoProcess: false, runnerIntervalMs: 10 });
+    restarted.startBackgroundRunner();
+    await waitFor(async () => (await restarted.snapshot()).items[0]?.state === "imported");
+    await restarted.stopBackgroundRunner();
+    expect(adapter.calls.create).toBe(0);
   });
 
   it("reprend le backlog après redémarrage avec le même stockage", async () => {
@@ -230,28 +309,26 @@ describe("moteur local persistant de file vidéo", () => {
     await expect(add(engine, [secondUrl])).rejects.toMatchObject({ code: "QUEUE_COMMAND_CONFLICT" });
   });
 
-  it("reflète les états du workflow sans dépasser transcript-ready", async () => {
+  it("ne fait pas progresser le workflow depuis la commande de lecture historique", async () => {
     const root = await tempRoot(); const adapter = new FakeWorkflowAdapter(); const engine = new VideoQueueEngine({ root, adapter, autoProcess: false });
     await add(engine); await engine.start(); const item = (await engine.snapshot()).items[0];
     adapter.workflows.set(item.workflowId!, workflow(item.workflowId!, item.canonicalUrl, "acquiring", { acquisitionId: "22222222-2222-4222-8222-222222222222" }));
-    expect((await engine.reconcile({ idempotencyKey: "command:sync:001" })).items[0].state).toBe("transcribing");
-    adapter.workflows.set(item.workflowId!, workflow(item.workflowId!, item.canonicalUrl, "transcript-ready", { acquisitionId: "22222222-2222-4222-8222-222222222222" }));
-    const ready = await engine.reconcile({ idempotencyKey: "command:sync:002" });
-    expect(ready.items[0].state).toBe("transcript-ready");
+    expect((await engine.reconcile({ idempotencyKey: "command:sync:001" })).items[0].state).toBe("paused");
+    expect(adapter.calls.synchronize).toBe(0);
     expect(adapter.calls.retry).toBe(0);
   });
 
-  it("reflète analyse requise, résultat prêt et import sans déclencher ces étapes", async () => {
+  it("laisse les états non actifs au runner plutôt qu’à la lecture API", async () => {
     const root = await tempRoot(); const adapter = new FakeWorkflowAdapter(); const engine = new VideoQueueEngine({ root, adapter, autoProcess: false });
     await add(engine); await engine.start(); const item = (await engine.snapshot()).items[0];
-    for (const [index, state, expected] of [
+    for (const [index, state] of [
       [1, "analysis-ready", "analysis-required"],
       [2, "preview-ready", "result-ready"],
       [3, "imported", "imported"],
     ] as const) {
       adapter.workflows.set(item.workflowId!, workflow(item.workflowId!, item.canonicalUrl, state));
       const snapshot = await engine.reconcile({ idempotencyKey: `command:later:${index}` });
-      expect(snapshot.items[0].state).toBe(expected);
+      expect(snapshot.items[0].state).toBe("paused");
     }
     expect(adapter.calls.retry).toBe(0);
   });

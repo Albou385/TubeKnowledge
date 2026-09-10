@@ -14,11 +14,8 @@ import {
   publicQueueItemError,
   queueNextAction,
   safeVideoLabel,
-  shouldPollVideoQueue,
   workflowActionLabel,
 } from "@/lib/video-queue/ui";
-
-const POLL_INTERVAL_MS = 4_000;
 
 function commandKey(action: string): string {
   const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -59,7 +56,6 @@ export function VideoQueueDashboard({ initialQueue, initialError = "" }: { initi
   const [results, setResults] = useState<AddVideoResult[]>([]);
   const [status, setStatus] = useState(initialError);
   const [pending, setPending] = useState<Set<string>>(new Set());
-  const [visible, setVisible] = useState(true);
   const inFlight = useRef(new Set<string>());
   const resultsRef = useRef<HTMLDivElement>(null);
   const parsed = useMemo(() => parseQueueInput(input), [input]);
@@ -70,37 +66,24 @@ export function VideoQueueDashboard({ initialQueue, initialError = "" }: { initi
     setPending(new Set(inFlight.current));
   }, []);
 
-  const reconcileSilently = useCallback(async (signal?: AbortSignal) => {
-    if (inFlight.current.has("reconcile")) return;
-    markPending("reconcile", true);
+  const refresh = useCallback(async () => {
+    if (inFlight.current.has("refresh")) return;
+    markPending("refresh", true);
     try {
-      const response = await fetch("/api/video-queue/reconcile", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ idempotencyKey: commandKey("reconcile") }), signal });
+      const response = await fetch("/api/video-queue", { method: "GET" });
       const payload = await response.json() as { queue?: VideoQueueSnapshot };
       if (response.ok && payload.queue) setQueue(payload.queue);
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) setStatus("Le suivi automatique est momentanément indisponible. Utilisez Actualiser l’état.");
-    } finally { markPending("reconcile", false); }
+      else setStatus("L’état de la file est momentanément indisponible.");
+    } catch { setStatus("L’état de la file est momentanément indisponible."); }
+    finally { markPending("refresh", false); }
   }, [markPending]);
 
+  // Une seule lecture rafraîchit le rendu après navigation. Elle ne déclenche
+  // aucune progression: le runner serveur reste l'unique moteur de la file.
   useEffect(() => {
-    function updateVisibility() { setVisible(document.visibilityState === "visible"); }
-    updateVisibility();
-    document.addEventListener("visibilitychange", updateVisibility);
-    return () => document.removeEventListener("visibilitychange", updateVisibility);
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => { void reconcileSilently(controller.signal); }, 50);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [reconcileSilently]);
-
-  useEffect(() => {
-    if (!visible || !shouldPollVideoQueue(queue)) return;
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => { void reconcileSilently(controller.signal); }, POLL_INTERVAL_MS);
-    return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [queue, reconcileSilently, visible]);
+    const task = window.setTimeout(() => { void refresh(); }, 0);
+    return () => window.clearTimeout(task);
+  }, [refresh]);
 
   async function mutate(key: string, endpoint: string, successMessage: string) {
     if (inFlight.current.has(key)) return;
@@ -139,14 +122,14 @@ export function VideoQueueDashboard({ initialQueue, initialError = "" }: { initi
   return <div aria-busy={pending.size > 0} className="space-y-8">
     <section className="rounded-3xl border border-cyan-200 bg-white p-6 shadow-sm sm:p-8 dark:border-cyan-950 dark:bg-slate-900">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div><h2 className="text-2xl font-bold">Ajouter plusieurs vidéos</h2><p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">Collez une URL YouTube par ligne. Les lignes vides et espaces sont ignorés. Chaque vidéo gardera son traitement individuel et ses confirmations.</p></div>
+        <div><h2 className="text-2xl font-bold">Ajouter des vidéos</h2><p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">Collez une ou plusieurs URL YouTube, une par ligne.</p></div>
         <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold dark:bg-slate-800">{parsed.lineCount} / 100 lignes</span>
       </div>
       <form onSubmit={submit} aria-busy={pending.has("add")} className="mt-6">
-        <label htmlFor="video-queue-urls" className="font-bold">URLs YouTube, une par ligne</label>
+        <label htmlFor="video-queue-urls" className="font-bold">URLs YouTube</label>
         <textarea id="video-queue-urls" value={input} onChange={(event) => setInput(event.target.value)} rows={7} spellCheck={false} placeholder={"https://www.youtube.com/watch?v=…\nhttps://youtu.be/…"} className="mt-2 w-full rounded-2xl border border-slate-300 bg-transparent px-4 py-3 font-mono text-sm outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:border-slate-700" />
         {parsed.validationMessage && input ? <p className="mt-2 text-sm text-rose-700 dark:text-rose-300">{parsed.validationMessage}</p> : null}
-        <div className="mt-4 flex flex-wrap items-center gap-3"><button type="submit" disabled={pending.has("add") || Boolean(parsed.validationMessage)} className="rounded-xl bg-cyan-400 px-6 py-3 font-bold text-slate-950 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900">{pending.has("add") ? "Ajout en cours…" : "Ajouter à la file"}</button><Link href="/add-video" className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold dark:border-slate-700">Traiter une seule vidéo</Link></div>
+        <div className="mt-4 flex flex-wrap items-center gap-3"><button type="submit" disabled={pending.has("add") || Boolean(parsed.validationMessage)} className="rounded-xl bg-cyan-400 px-6 py-3 font-bold text-slate-950 outline-none disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900">{pending.has("add") ? "Ajout en cours…" : "Ajouter"}</button></div>
       </form>
     </section>
 
@@ -155,8 +138,8 @@ export function VideoQueueDashboard({ initialQueue, initialError = "" }: { initi
     {results.length ? <section ref={resultsRef} tabIndex={-1} aria-labelledby="queue-results-title" className="outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"><h2 id="queue-results-title" className="text-2xl font-bold">Résultat de l’ajout</h2><div className="mt-4 grid gap-4 md:grid-cols-2">{Object.entries(grouped).map(([group, entries]) => entries.length ? <div key={group} className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900"><h3 className="font-bold">{ADD_RESULT_TITLES[group as keyof typeof ADD_RESULT_TITLES]} · {entries.length}</h3><ul className="mt-3 space-y-2 text-sm">{entries.map((result) => { const workflowId = resultWorkflowId(result); return <li key={`${group}-${result.inputIndex}`} className="rounded-xl bg-slate-50 p-3 dark:bg-slate-950"><span>{result.videoId ? safeVideoLabel(result.videoId) : `Ligne ${result.inputIndex + 1}`}</span>{workflowId ? <Link href={`/workflows/${workflowId}`} className="ml-2 font-semibold text-cyan-700 dark:text-cyan-300">Ouvrir le traitement existant</Link> : null}</li>; })}</ul></div> : null)}</div></section> : null}
 
     <section aria-labelledby="queue-list-title">
-      <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-semibold tracking-[0.16em] text-cyan-700 uppercase dark:text-cyan-300">File locale · concurrence 1</p><h2 id="queue-list-title" className="mt-2 text-2xl font-bold">Vidéos dans la file</h2><p className="mt-2 text-sm text-slate-500">La pause laisse finir l’opération active, puis empêche le prochain départ.</p></div><div className="flex flex-wrap gap-3">{queue.paused ? <button type="button" disabled={pending.has("resume")} onClick={() => mutate("resume", "/api/video-queue/resume", "File reprise. L’état est réconcilié avant le prochain départ.")} className="rounded-xl bg-cyan-400 px-4 py-2 font-bold text-slate-950 disabled:opacity-50">{pending.has("resume") ? "Reprise…" : "Reprendre la file"}</button> : <button type="button" disabled={pending.has("pause")} onClick={() => mutate("pause", "/api/video-queue/pause", "File mise en pause. L’opération active peut se terminer.")} className="rounded-xl border border-slate-300 px-4 py-2 font-semibold disabled:opacity-50 dark:border-slate-700">{pending.has("pause") ? "Pause…" : "Mettre en pause"}</button>}<button type="button" disabled={pending.has("reconcile")} onClick={() => mutate("reconcile", "/api/video-queue/reconcile", "État actualisé.")} className="rounded-xl border border-slate-300 px-4 py-2 font-semibold disabled:opacity-50 dark:border-slate-700">{pending.has("reconcile") ? "Actualisation…" : "Actualiser l’état"}</button></div></div>
-      <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">{queue.items.length ? queue.items.map((item) => <QueueItemCard key={item.itemId} item={item} pending={pending.has(`cancel:${item.itemId}`) || pending.has(`retry:${item.itemId}`)} onCancel={() => void cancel(item)} onRetry={() => void mutate(`retry:${item.itemId}`, `/api/video-queue/items/${item.itemId}/retry`, "Nouvelle tentative lancée sur le même traitement.")} />) : <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500 lg:col-span-2 dark:border-slate-700"><h3 className="font-bold text-slate-700 dark:text-slate-200">La file est vide</h3><p className="mt-2">Ajoutez quelques URL ci-dessus, ou utilisez le parcours individuel pour une seule vidéo.</p></div>}</div>
+      <div className="flex flex-wrap items-end justify-between gap-4"><div><h2 id="queue-list-title" className="text-2xl font-bold">En cours</h2><p className="mt-2 text-sm text-slate-500">Les vidéos sont traitées une à la fois, même lorsque cette page est fermée.</p></div><div className="flex flex-wrap gap-3"><button type="button" disabled={pending.has("refresh")} onClick={() => void refresh()} className="rounded-xl border border-slate-300 px-4 py-2 font-semibold disabled:opacity-50 dark:border-slate-700">{pending.has("refresh") ? "Actualisation…" : "Actualiser l’état"}</button>{queue.paused ? <button type="button" disabled={pending.has("resume")} onClick={() => mutate("resume", "/api/video-queue/resume", "Traitement repris.")} className="rounded-xl bg-cyan-400 px-4 py-2 font-bold text-slate-950 disabled:opacity-50">{pending.has("resume") ? "Reprise…" : "Reprendre"}</button> : <button type="button" disabled={pending.has("pause")} onClick={() => mutate("pause", "/api/video-queue/pause", "Traitement mis en pause.")} className="rounded-xl border border-slate-300 px-4 py-2 font-semibold disabled:opacity-50 dark:border-slate-700">{pending.has("pause") ? "Pause…" : "Mettre en pause"}</button>}</div></div>
+      <div className="mt-5 grid min-w-0 gap-4 lg:grid-cols-2">{queue.items.length ? queue.items.map((item) => <QueueItemCard key={item.itemId} item={item} pending={pending.has(`cancel:${item.itemId}`) || pending.has(`retry:${item.itemId}`)} onCancel={() => void cancel(item)} onRetry={() => void mutate(`retry:${item.itemId}`, `/api/video-queue/items/${item.itemId}/retry`, "Nouvelle tentative lancée.")} />) : <div className="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500 lg:col-span-2 dark:border-slate-700"><h3 className="font-bold text-slate-700 dark:text-slate-200">Aucune vidéo en cours</h3><p className="mt-2">Ajoutez une ou plusieurs URL ci-dessus.</p></div>}</div>
     </section>
   </div>;
 }

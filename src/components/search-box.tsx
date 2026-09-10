@@ -97,7 +97,7 @@ export function SearchBox() {
               className="block rounded-lg px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">{result.title}</span>
-              <span className="mt-0.5 block text-xs text-cyan-700 dark:text-cyan-300">{result.section} · {result.relativePath}</span>
+              <span className="mt-0.5 block text-xs text-cyan-700 dark:text-cyan-300">{result.section}</span>
               <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-600 dark:text-slate-400">{result.excerpt}</span>
             </Link>
           ))}

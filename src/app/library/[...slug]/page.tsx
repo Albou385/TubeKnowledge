@@ -55,10 +55,11 @@ export default async function LibraryPage({ params }: LibraryPageProps) {
     <LibraryShell tree={library.tree} currentPath={document.relativePath}>
       <div className="mx-auto max-w-6xl">
         <nav aria-label="Fil d’Ariane" className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-          <Link href="/" className="hover:text-cyan-300">Accueil</Link>
+          <Link href="/library" className="hover:text-cyan-300">Bibliothèque</Link>
           {crumbs.map((crumb, index) => {
             const isDocument = index === crumbs.length - 1;
             const logicalPath = crumbs.slice(0, index + 1).map(encodeURIComponent).join("/");
+            if (crumb === "01_BIBLIOTHEQUE") return null;
             return (
               <span key={`${crumb}:${index}`} className="flex items-center gap-2">
                 <span aria-hidden="true">/</span>
@@ -73,9 +74,7 @@ export default async function LibraryPage({ params }: LibraryPageProps) {
         </nav>
 
         <header className="mb-8 border-b border-slate-200 pb-6 dark:border-slate-800">
-          <p className="text-xs font-semibold tracking-[0.16em] text-cyan-400 uppercase">Document Markdown</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl dark:text-white">{document.title}</h1>
-          <p className="mt-2 break-all text-sm text-slate-500">{document.relativePath}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl dark:text-white">{document.title}</h1>
           <dl className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-slate-500">
             <div><dt className="inline font-semibold">Section :</dt> <dd className="inline">{document.section}</dd></div>
             <div><dt className="inline font-semibold">Modifié :</dt> <dd className="inline">{formattedDate}</dd></div>
